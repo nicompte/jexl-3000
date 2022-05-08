@@ -1,0 +1,299 @@
+============================================
+Strings
+============================================
+
+"A string with \"double\" and 'single' quotes"
+'A string with "double" and \'single\' quotes'
+'\\'
+"\\"
+
+'A string with new \
+line'
+
+----
+
+(program
+  (expression_statement
+    (string
+      (string_fragment) (escape_sequence) (string_fragment)
+      (escape_sequence) (string_fragment)))
+  (expression_statement
+     (string
+      (string_fragment) (escape_sequence) (string_fragment)
+      (escape_sequence) (string_fragment)))
+  (expression_statement (string (escape_sequence)))
+  (expression_statement (string (escape_sequence)))
+  (expression_statement
+    (string (string_fragment) (escape_sequence) (string_fragment))))
+
+============================================
+Numbers
+============================================
+
+101
+3.14
+3.14e+1
+0x1ABCDEFabcdef
+0o7632157312
+0b1010101001
+1e+3
+
+---
+
+(program
+  (expression_statement (number))
+  (expression_statement (number))
+  (expression_statement (number))
+  (expression_statement (number))
+  (expression_statement (number))
+  (expression_statement (number))
+  (expression_statement (number)))
+
+============================================
+Variables
+============================================
+
+theVar
+theVar2
+$_
+\u0061\u{62}cd
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement (identifier)))
+
+============================================
+Booleans
+============================================
+
+this
+null
+true
+false
+
+---
+
+(program
+  (expression_statement (this))
+  (expression_statement (null))
+  (expression_statement (true))
+  (expression_statement (false)))
+
+============================================
+Regexps
+============================================
+
+/one\\/
+/one/g
+/one/i
+/one/gim
+/on\/e/gim
+/on[^/]afe/gim
+/[\]/]/
+
+---
+
+(program
+  (expression_statement (regex (regex_pattern)))
+  (expression_statement (regex (regex_pattern) (regex_flags)))
+  (expression_statement (regex (regex_pattern) (regex_flags)))
+  (expression_statement (regex (regex_pattern) (regex_flags)))
+  (expression_statement (regex (regex_pattern) (regex_flags)))
+  (expression_statement (regex (regex_pattern) (regex_flags)))
+  (expression_statement (regex (regex_pattern))))
+
+============================================
+Objects
+============================================
+
+{ a: "b" }
+{ c: "d", "e": f, 1: 2 }
+{
+  g: h
+}
+
+---
+
+(program
+  (expression_statement (object
+    (pair (property_identifier) (string (string_fragment)))))
+  (expression_statement (object
+    (pair (property_identifier) (string (string_fragment)))
+    (pair (string (string_fragment)) (identifier))
+    (pair (number) (number))))
+  (expression_statement (object
+    (pair (property_identifier) (identifier)))))
+
+============================================
+Objects with reserved words for keys
+============================================
+
+{
+  static: true,
+  async: true,
+}
+
+---
+
+(program
+  (expression_statement (object
+    (pair (property_identifier) (true))
+    (pair (property_identifier) (true)))))
+
+============================================
+Arrays
+============================================
+
+[]
+[ "item1" ]
+[ "item1", ]
+[ "item1", item2 ]
+
+---
+
+(program
+  (expression_statement (array))
+  (expression_statement (array (string (string_fragment))))
+  (expression_statement (array (string (string_fragment))))
+  (expression_statement (array (string (string_fragment)) (identifier))))
+
+============================================
+Property access
+============================================
+
+x.someProperty
+
+---
+
+(program
+  (expression_statement (member_expression (identifier) (property_identifier))))
+
+============================================
+Math operators
+============================================
+
+i + j * 3 - j % 5
+2 * i * 3
+
+---
+
+(program
+  (expression_statement (binary_expression
+    (binary_expression
+      (identifier)
+      (binary_expression (identifier) (number)))
+    (binary_expression (identifier) (number))))
+  (expression_statement (binary_expression
+    (binary_expression (number) (identifier))
+    (number))))
+
+============================================
+Boolean operators
+============================================
+
+i || j
+i && j
+!a && !b || !c && !d
+
+---
+
+(program
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression
+    (binary_expression
+      (unary_expression (identifier))
+      (unary_expression (identifier)))
+    (binary_expression
+      (unary_expression (identifier))
+      (unary_expression (identifier))))))
+
+============================================
+Relational operators
+============================================
+
+x < y
+x <= y
+x == y
+x != y
+x >= y
+x > y
+
+---
+
+(program
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier))))
+
+==============================================
+Ternaries
+==============================================
+
+condition ? case1 : case2
+
+some.condition ?
+  some.case :
+  some.other.case
+
+a?.1:.2
+
+---
+
+(program
+  (expression_statement
+    (ternary_expression
+      (identifier)
+      (identifier)
+      (identifier)))
+  (expression_statement
+    (ternary_expression
+        (member_expression
+          (identifier)
+          (property_identifier))
+        (member_expression
+          (identifier)
+          (property_identifier))
+        (member_expression
+          (member_expression
+            (identifier)
+            (property_identifier))
+           (property_identifier))))
+  (expression_statement
+    (ternary_expression
+      (identifier)
+      (number)
+      (number))))
+
+==============================================
+Operator precedence
+==============================================
+
+a <= b && c >= d
+a.b == c ? d : e
+a in b != c in d
+
+---
+
+(program
+  (expression_statement (binary_expression
+    (binary_expression (identifier) (identifier))
+    (binary_expression (identifier) (identifier))))
+  (expression_statement (ternary_expression
+    (binary_expression
+      (member_expression
+              (identifier)
+              (property_identifier))
+      (identifier))
+     (identifier)
+          (identifier)))
+  (expression_statement (binary_expression
+    (binary_expression (identifier) (identifier))
+    (binary_expression (identifier) (identifier)))))

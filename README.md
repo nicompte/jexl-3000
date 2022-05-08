@@ -1,15 +1,66 @@
-# jexl-rs [![CircleCI](https://circleci.com/gh/mozilla/jexl-rs/tree/main.svg?style=svg)](https://circleci.com/gh/mozilla/jexl-rs/tree/main)
+# jexl-3000
 
-> [JEXL](https://www.npmjs.com/package/jexl) in Rust
+jexl-3000 is a fork from [github.com/mozilla/jexl-rs](github.com/mozilla/jexl-rs) that adds:
+- a set of transforms
+- parsing cache
+- map/reduce/filter and similar transforms, that take an expression as input
 
+It does not aim to be compatible with the jexl specification.
 
-* jexl-eval: [![](https://img.shields.io/crates/v/jexl-eval.svg)](https://crates.io/crates/jexl-eval) [![](https://docs.rs/jexl-eval/badge.svg?v=2)](https://docs.rs/jexl-eval)
-* jexl-parser: [![](https://img.shields.io/crates/v/jexl-parser.svg)](https://crates.io/crates/jexl-parser) [![](https://docs.rs/jexl-parser/badge.svg?v=2)](https://docs.rs/jexl-parser)
+## Usage
 
-## Releases
+### From rust
 
-Releases are done using `cargo release`. Check [cargo-release](https://github.com/sunng87/cargo-release) for more information
+Add `jexl-3000` to your dependencies:
 
-## License
+```toml
+[dependencies]
+jexl-3000 = "0.0.1"
+```
 
-This project is licensed under the [Mozilla Public License 2.0](https://github.com/tarikeshaq/update-notifier/blob/master/LICENSE)
+Import and use:
+
+```rust
+use jexl_3000::build_evaluator;
+use serde_json::json;
+
+fn main() {
+    let evaluator = build_evaluator;
+    let context = json!({
+        "users": [
+            {"name": "Bob", "age": 22},
+            {"name": "Alicia", "age": 23},
+            {"name": "Peter": "age": 19}
+        ]
+    });
+    let res = evaluator.eval_in_context("{meanAge: users | pick('age') | mean | toInt, youngest: users | sortByAttribute('age') | first}", &context);
+    assert_eq!(res, json!({"meanAge": 21, "youngest": "Peter"}))
+}
+```
+
+### From node
+
+Add `jexl-3000` to your package.json:
+
+```bash
+npm i jexl-3000
+```
+
+Import and use:
+
+```js
+const Evaluator = require('jexl-3000').Evaluator;
+const evaluator = new Evaluator();
+const context = {
+    users: [
+        {name: 'Bob', age: 22},
+        {name: 'Alicia', age: 23},
+        {name: 'Peter': age: 19},
+    ]
+};
+const res = evaluator.evaluate("{meanAge: users | pick('age') | mean | toInt, youngest: users | sortByAttribute('age') | first}", context);
+```
+
+### From wasm
+
+TODO: add doc

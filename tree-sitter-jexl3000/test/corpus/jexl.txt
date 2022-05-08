@@ -1,0 +1,15 @@
+============================================
+Transforms
+============================================
+
+test | youpi(123, 12)
+
+----
+
+ (program
+      (transform
+        (identifier)
+        (identifier)
+        (arguments
+          (number)
+          (number))))

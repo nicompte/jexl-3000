@@ -1,6 +1,13 @@
 [workspace]
 members = [
-    "jexl-parser",
+    "jexl-3000",
     "jexl-eval",
+    "jexl-node",
+    "jexl-parser",
+    "jexl-server",
     "parser-gen",
+    "jexl-wasm",
+]
+exclude = [
+    "jexl-serverless",
 ]

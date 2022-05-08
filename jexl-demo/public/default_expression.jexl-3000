@@ -1,0 +1,34 @@
+{
+  best_vote: movies
+    | sortByAttribute('vote_average', -1)
+    | first
+    | apply({title: this.title, note: this.vote_average}),
+  in_french_movies: movies 
+    | filter(this.language == 'fr')
+  	# take half of the films only
+  	| apply(this | range(0, this | len // 2))
+  	| pick('title'),
+  # sort by popularity, then take first and last elements
+  least_and_most_popular: movies
+    | sortByAttribute('popularity')
+    | apply([this | first, this | last])
+    | map({title: this.title, popularity: this.popularity, note: this.vote_average}),
+  most_revenue: movies
+  	| sortByAttribute('revenue', -1)
+  	| first
+  	| apply({title: this.title, revenue: '$' + this.revenue | toString}),
+  nb_thrillers: movies
+    | filter(this.genre | contains('Thriller'))
+    | len,
+  # titles that do not contain latin characters
+  non_latin: movies
+    | reduce(
+    		[], 
+    		(!(this.title ~ /[a-zA-Z]/)) ? acc | push(this.title) : acc
+  	  ),
+  oldest: movies
+    | filter(this.release_date != '')
+  	| sortBy(this.release_date | toDate('%Y-%m-%d'))
+    | first
+  	| apply({title: this.title, date: this.release_date}),
+}

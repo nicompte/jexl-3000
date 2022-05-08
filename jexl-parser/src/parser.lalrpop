@@ -1,8 +1,14 @@
 use std::str::FromStr;
 
-use crate::ast::{Expression, OpCode};
+use crate::ast::{Expression, OpCode, UnCode, ExpressionTransform};
 
 grammar;
+
+match {
+    r"\s*" => { }, // The default whitespace skipping is disabled an `ignore pattern` is specified
+    r"#[^\n\r]*[\n\r]*" => { }, // Skip `# comments`
+    _
+}
 
 pub Expression: Box<Expression> = Expr00;
 
@@ -28,61 +34,95 @@ Expr30: Box<Expression> = {
 
 Expr40: Box<Expression> = {
     <left: Expr40> <operation: Op50> <right: Expr50> => Box::new(Expression::BinaryOperation { left, right, operation }),
+    Expr41,
+};
+
+Expr41: Box<Expression> = {
+    <operation: Un10> <right: Expr50> => Box::new(Expression::UnaryOperation { right, operation }),
     Expr50,
 };
 
 Expr50: Box<Expression> = {
     <left: Expr50> "?" <truthy: Expr60> ":" <falsy: Expr60> => Box::new(Expression::Conditional {left, truthy, falsy}),
+    Expr51,
+};
+
+Expr51: Box<Expression> = {
+    "if" <left: Expr51> "{" <truthy: Expr60> "}" "else" "{" <falsy: Expr60> "}" => Box::new(Expression::Conditional {left, truthy, falsy}),
     Expr60,
-}
+};
 
 Expr60: Box<Expression> = {
     <subject: Expr60> "|" <name: Identifier> <args: Args?> => Box::new(Expression::Transform{name, subject, args}),
     Expr70
 };
 
-
-/// Expression for dereferencing.
-/// Used for dereferencing object literals, array literals, and the context
-/// There are two types of operations here:
-/// - Either a `dot` operation, taking an expression on the left hand side, and an identifier on the right hand side (a string without the quotations)
-/// - Or an `index` operation, taking an expression on the left hand side, and another expression inside square ("[]") brackets.
-///
-/// # Examples:
-/// 
-/// Assume our context is the following
-/// ```
-///{
-///  "foo":
-///  {
-///     "bar": [{"baz": 1}, {"bobo": [13, 12]}]
-//   }
-// }
-/// ```
-///
-/// `foo.bar == [{"baz": 1}, {"bobo": [13, 12]]`
-/// `foo.bar[0] == {"baz": 1}`
-/// `foo.bar[1].bobo[0] == 13`
-/// `[1, 2, 3][1] == 2`
 Expr70: Box<Expression> = {
-    <subject: Expr70> <index: Index> => Box::new(Expression::IndexOperation{subject, index}),
-    <subject: Expr70> "." <ident: Identifier>  => Box::new(Expression::DotOperation{subject, ident}),
+    <subject: Expr60>  "|" "mapTransform(" <name: Identifier> <args: Args?> ")" => Box::new(Expression::MapTransform {name, subject, args }),
     Expr80
-};
+}
 
 Expr80: Box<Expression> = {
+    <subject: Expr60> "|" "filterTransform(" <name: Identifier> <args: Args?> ")" => Box::new(Expression::FilterTransform {name, subject, args }),
+    Expr81
+}
+
+Expr81: Box<Expression> = {
+    <subject: Expr60>  "|" <name: ET> "(" <expression: Expression> ","? <args: Number?> ")" => Box::new(Expression::ExpressionTransform {name, subject, expression, args }),
+    Expr82
+}
+
+Expr82: Box<Expression> = {
+    <subject: Expr60> "|" "reduce(" <init: Expression> "," <expression: Expression> ")" => Box::new(Expression::ReduceExpression { subject, init, expression }),
+    Expr85
+}
+
+Expr85: Box<Expression> = {
+    "date(" <date: Expr85> "," <format: Expression> ")" => Box::new(Expression::Date { date, format }),
+    Expr86
+}
+
+Expr86: Box<Expression> = {
+    "datetime(" <datetime: Expr80> "," <format: Expression> ")" => Box::new(Expression::DateTime { datetime, format }),
+    Expr87
+}
+
+Expr87: Box<Expression> = {
+    "duration(" <duration: Expr80> "," <duration_type: Expression> ")" => Box::new(Expression::Duration { duration, duration_type }),
+    Expr88
+}
+
+Expr88: Box<Expression> = {
+   "$now" => Box::new(Expression::Now),
+    Expr90
+}
+
+Expr90: Box<Expression> = {
+    <subject: Expr70> <index: Index> => Box::new(Expression::IndexOperation{subject, index}),
+    <subject: Expr70> "." <ident: Identifier>  => Box::new(Expression::DotOperation{subject, ident}),
+    Expr100
+};
+
+Expr100: Box<Expression> = {
     Number => Box::new(Expression::Number(<>)),
     Boolean => Box::new(Expression::Boolean(<>)),
     String => Box::new(Expression::String(<>)),
     Array => Box::new(Expression::Array(<>)),
     Object => Box::new(Expression::Object(<>)),
     Identifier => Box::new(Expression::Identifier(<>)),
+    Regex => Box::new(Expression::Regex(<>)),
     "(" <Expression> ")",
 };
 
 Args: Vec<Box<Expression>> = {
     "(" <Comma<Expression>> ")"
 };
+
+Un10: UnCode = {
+    "!" => UnCode::Not,
+    "-" => UnCode::Minus,
+    "+" => UnCode::Plus,
+}
 
 Op10: OpCode = {
     "&&" => OpCode::And,
@@ -97,6 +137,9 @@ Op20: OpCode = {
     ">" => OpCode::Greater,
     "<" => OpCode::Less,
     "in" => OpCode::In,
+    "~" => OpCode::Matches,
+    "@" => OpCode::Capture,
+    "@+" => OpCode::CaptureMultiple,
 };
 
 Op30: OpCode = {
@@ -115,10 +158,21 @@ Op50: OpCode = {
     "^" => OpCode::Exponent,
 };
 
+ET: ExpressionTransform = {
+    "map" => ExpressionTransform::Map,
+    "filter" => ExpressionTransform::Filter,
+    "sortBy" => ExpressionTransform::SortBy,
+    "any" => ExpressionTransform::Any,
+    "all" => ExpressionTransform::All,
+    "find" => ExpressionTransform::Find,
+    "findIndex" => ExpressionTransform::FindIndex,
+    "apply" => ExpressionTransform::Apply,
+};
+
 Number: f64 = {
-    r"[0-9]+" => f64::from_str(<>).unwrap(),
-    r"[0-9]+\.[0-9]*" => f64::from_str(<>).unwrap(),
-    r"\.[0-9]+" => f64::from_str(<>).unwrap(),
+    r"-?[0-9]+" => f64::from_str(<>).unwrap(),
+    r"-?[0-9]+\.[0-9]*" => f64::from_str(<>).unwrap(),
+    r"-?\.[0-9]+" => f64::from_str(<>).unwrap(),
 };
 
 String: String = {
@@ -126,6 +180,9 @@ String: String = {
     <s: r#"'([^'\\]*(\\')?)*'"#> => s[1..s.len() - 1].to_string().replace("\\'", "'"),
 };
 
+Regex: String = {
+    <s: r#"/([^']*(\\')?)*/"#> => s[1..s.len() - 1].to_string(),
+}
 
 Identifier: String = {
     r#"[a-zA-Z_][a-zA-Z0-9_]*"# => <>.to_string()
@@ -135,7 +192,6 @@ Index: Box<Expression> = {
     "[" "." <ident: Identifier> <op: Op20> <right: Expr80> "]" => Box::new(Expression::Filter {ident, op, right}),
     "[" <Expression> "]",
 }
-
 
 Boolean: bool = {
     "true" => true,

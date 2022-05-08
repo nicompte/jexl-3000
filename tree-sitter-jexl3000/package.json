@@ -1,0 +1,41 @@
+{
+  "name": "tree-sitter-jexl3000",
+  "version": "0.20.0",
+  "description": "Jexl3000 grammar for node-tree-sitter",
+  "main": "bindings/node",
+  "keywords": [
+    "parser",
+    "lexer"
+  ],
+  "author": "Nicolas Barbotte",
+  "license": "MIT",
+  "dependencies": {
+    "nan": "^2.12.1"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.20.0"
+  },
+  "scripts": {
+    "test": "tree-sitter test && script/parse-examples",
+    "test-windows": "tree-sitter test"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.jexl3000",
+      "file-types": [
+        "jexl3000",
+        "jexl"
+      ],
+      "highlights": [
+        "queries/highlights.scm"
+      ],
+      "injection-regex": "^(jexl|jexl3000)$",
+      "theme": {
+        "keyword": "purple",
+        "function": "blue",
+        "type": "green",
+        "number": "brown"
+      }
+    }
+  ]
+}

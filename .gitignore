@@ -1,3 +1,10 @@
-/target
-**/*.rs.bk
-.vscode
+.DS_Store
+**/target
+**/node_modules
+**/dist
+.env*
+!.env.example
+**/*.jsonl
+# Local Netlify folder
+.netlify
+profiles

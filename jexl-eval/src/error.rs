@@ -19,6 +19,18 @@ pub enum EvaluationError<'a> {
     },
     #[error("Unknown transform: {0}")]
     UnknownTransform(String),
+    #[error("Unknown filter: {0}")]
+    UnknownFilter(String),
+    #[error("Expected a boolean response for filter: {0}")]
+    ExpectedBoolForFilter(String),
+    #[error("Expected an array for {0}, got {1}")]
+    ExpectedArray(String, String),
+    #[error("Expected a string for {0}, got {1}")]
+    ExpectedString(String, String),
+    #[error("Expected an array or a string for {0}, got {1}")]
+    ExpectedArrayOrString(String, String),
+    #[error("Expected a number for {0}, got {1}")]
+    ExpectedNumber(String, String),
     #[error("Duplicate object key: {0}")]
     DuplicateObjectKey(String),
     #[error("Identifier '{0}' is undefined")]
@@ -27,12 +39,27 @@ pub enum EvaluationError<'a> {
     InvalidContext,
     #[error("Invalid index type")]
     InvalidIndexType,
+    #[error("Index out of range {0}")]
+    IndexOutOfRange(usize),
     #[error("Invalid json: {0}")]
     JSONError(#[from] serde_json::Error),
     #[error("Custom error: {0}")]
     CustomError(#[from] anyhow::Error),
     #[error("Invalid filter")]
     InvalidFilter,
+    #[error("Invalid range")]
+    InvalidRange,
+    #[error("Filter should return a bool")]
+    FilterShouldReturnBool,
+    #[error("Invalid duration: {0}")]
+    InvalidDuration(String),
+    #[error("Failed transform: {0}")]
+    FailedTransform(String),
+    #[error("Failed to evaluate expression: {0}")]
+    FailedEvaluation(String),
+
+    #[error("UnavailableExpression")]
+    UnavailableExpression,
 }
 
 impl<'a> From<ParseError<usize, Token<'a>, &'a str>> for EvaluationError<'a> {

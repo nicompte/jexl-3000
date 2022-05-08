@@ -1,0 +1,11 @@
+(
+  (call_expression
+    function: (identifier) @name) @reference.call
+  (#not-match? @name "^(require)$")
+)
+
+(call_expression
+  function: (member_expression
+    property: (property_identifier) @name)
+  arguments: (_) @reference.call)
+

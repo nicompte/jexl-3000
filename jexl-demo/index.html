@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>jexl-3000 Playground</title>
+  <meta property="og:title" content="jexl-3000 Playground" />
+  <meta property="og:url" content="https://jexl-3000.barbotte.net" />
+  <meta property="og:image" content="https://jexl-3000.barbotte.net/logo.png" />
+  <meta name="description" content="Playground for jexl-3000">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@200&display=swap&test=Playgroundexpressioncontextresult"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.45.0/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/clusterize.js/0.18.0/clusterize.min.css">
+  <link rel="icon" type="image/png" href="http://tree-sitter.github.io/tree-sitter/images/favicon-32x32.png"
+    sizes="32x32" />
+  <link rel="apple-touch-icon" sizes="57x57" href="/favicon/apple-icon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="/favicon/apple-icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="/favicon/apple-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="/favicon/apple-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="/favicon/apple-icon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="/favicon/apple-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="/favicon/apple-icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/favicon/apple-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-icon-180x180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+  <link rel="manifest" href="/favicon/manifest.json">
+  <meta name="msapplication-TileColor" content="#ffffff">
+  <meta name="msapplication-TileImage" content="/favicon/ms-icon-144x144.png">
+  <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+  <div id="playground-container" style="visibility: hidden;">
+    <header>
+      <img src="/logo.png" alt="logo" />
+      <span id="header-title">Playground</span>
+      <div class=header-item>
+      </div>
+
+      <div class=header-item>
+        <label for="logging-checkbox">log</label>
+        <input id="logging-checkbox" type="checkbox" />
+      </div>
+
+      <div class=header-item>
+        <label for="query-checkbox">query</label>
+        <input id="query-checkbox" type="checkbox" />
+      </div>
+
+      <div class=header-item>
+        <label for="update-time">parse time: </label>
+        <span id="update-time"></span>
+      </div>
+
+      <select id="language-select" style="display: none;">
+        <option value="jexl3000">Parser</option>
+      </select>
+    </header>
+
+    <main>
+      <div id="input-pane">
+        <div id="code-container">
+          <span class="code-title">Context</span>
+          <textarea id="context-input"></textarea>
+        </div>
+
+        <div id="query-container" style="visibility: hidden; position: absolute; display: none;">
+          <textarea id="query-input"></textarea>
+        </div>
+      </div>
+
+      <div id="context-container">
+        <span class="code-title">Expression</span>
+        <textarea id="code-input"></textarea>
+      </div>
+
+      <div id="output-container-scroll">
+        <pre id="output-container" class="highlight" style="display: none;"></pre>
+        <span class="code-title">Result</span>
+        <textarea id="response-input"></textarea>
+      </div>
+    </main>
+  </div>
+
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"
+    integrity="sha512-IS1FyxQkiJHT1SAvLXBaJu1UTFSIw0GT/DuzxHl69djqyLoEwGmR2davcZUnB8M7ppi9nfTGZR/vdfqmWt+i6A=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/clusterize.js/0.18.0/clusterize.min.js"></script>
+
+  <script>LANGUAGE_BASE_URL = "";</script>
+  <!-- <script type="module" src=/tree-sitter.js></script> -->
+  <script defer type="module" src=./src/playground.js></script>
+
+  <style>
+    /* reset */
+    html {
+      box-sizing: border-box;
+      /*font-size: 16px;*/
+    }
+
+    *,
+    *:before,
+    *:after {
+      box-sizing: inherit;
+    }
+
+    body,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    ol,
+    ul {
+      margin: 0;
+      padding: 0;
+      font-weight: normal;
+    }
+
+    ol,
+    ul {
+      list-style: none;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* end of reset */
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #playground-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: rebeccapurple;
+      box-sizing: border-box;
+      padding: 15px;
+      height: 80px;
+      border-bottom: 1px solid #aaa;
+      position: relative;
+      font-family: 'Source Code Pro', monospace;
+    }
+
+    .code-title {
+      font-size: 0.9em;
+      opacity: 0.9;
+      font-family: 'Source Code Pro', monospace;
+      color: rebeccapurple;
+      position: absolute;
+      right: 0.5em;
+      top: 0.5em;
+      z-index: 100;
+      user-select: none;
+    }
+
+    #header-title {
+      font-family: 'Source Code Pro', monospace;
+      position: absolute;
+      right: 1em;
+      font-size: 1.8em;
+      line-height: 1.7;
+      color: #F5BA58;
+    }
+
+    header img {
+      position: absolute;
+      left: 2em;
+      top: 10px;
+      height: 75%;
+    }
+
+    main {
+      flex: 1;
+      position: relative;
+    }
+
+    #input-pane {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 50%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #code-container,
+    #query-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      border-right: 1px solid #aaa;
+      border-bottom: 1px solid #aaa;
+    }
+
+    #query-container {}
+
+    #context-container {
+      border-bottom: 1px solid #aaa;
+      position: absolute;
+      top: 0;
+      left: 50%;
+      right: 0;
+      bottom: 50%;
+    }
+
+    #output-container-scroll {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      bottom: 0;
+      right: 0;
+    }
+
+    .header-item {
+      margin-right: 30px;
+      display: none;
+    }
+
+    #playground-container .CodeMirror {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+    }
+
+    #output-container-scroll {
+      flex: 1;
+      padding: 0;
+      overflow: auto;
+    }
+
+    #output-container {
+      padding: 0 10px;
+      margin: 0;
+    }
+
+    #logging-checkbox {
+      vertical-align: middle;
+    }
+
+    .CodeMirror div.CodeMirror-cursor {
+      border-left: 3px solid red;
+    }
+
+    a {
+      text-decoration: none;
+      color: #040404;
+      padding: 2px;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    a.highlighted {
+      background-color: #d9d9d9;
+      color: red;
+      border-radius: 3px;
+      text-decoration: underline;
+    }
+
+    .query-error {
+      text-decoration: underline red dashed;
+      -webkit-text-decoration: underline red dashed;
+    }
+  </style>
+  <!-- Cloudflare Web Analytics -->
+  <script defer src='https://static.cloudflareinsights.com/beacon.min.js'
+    data-cf-beacon='{"token": "8d13b2c870064d81b0eb39493319143d"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+
+</html>
