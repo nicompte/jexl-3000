@@ -15,7 +15,7 @@ thiserror = "1.0.30"
 anyhow = "1.0.57"
 chrono = "0.4.19"
 regex = "1.5.5"
-dashmap = "5.2.0"
+dashmap = "5.3.3"
 fxhash = "0.2.1"
 rustc-hash = "1.1.0"
 
