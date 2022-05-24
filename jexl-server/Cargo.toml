@@ -24,7 +24,7 @@ tracing-futures = "0.2.5"
 opentelemetry = { version = "0.17.0", features = ["rt-tokio", "metrics", "trace"] }
 opentelemetry-otlp = { version = "0.10.0", optional = true, features = ["metrics", "tls", "trace"], default-features = false }
 opentelemetry-prometheus = "0.10.0"
-prometheus = "0.13.0"
+prometheus = "0.13.1"
 serde = { version = "1.0.136", features = ["derive"] }
 utoipa = { version = "1.0.1", features = ["json", "serde_json"] }
 rayon = "1.5.3"
