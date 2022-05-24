@@ -751,19 +751,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jexl-3000-node"
-version = "0.0.0"
-dependencies = [
- "jexl-3000",
- "napi",
- "napi-build",
- "napi-derive",
- "rayon",
- "serde_json",
- "tikv-jemallocator",
-]
-
-[[package]]
 name = "jexl-eval"
 version = "0.1.7"
 dependencies = [
@@ -778,6 +765,19 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "jexl-node"
+version = "0.0.0"
+dependencies = [
+ "jexl-3000",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "rayon",
+ "serde_json",
+ "tikv-jemallocator",
 ]
 
 [[package]]
@@ -1088,9 +1088,9 @@ dependencies = [
 
 [[package]]
 name = "napi-build"
-version = "2.0.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6bba07d993e9865e6000062849a7644194be1b08c81968e7f02efd00e2dd49b"
+checksum = "ebd4419172727423cf30351406c54f6cc1b354a2cfb4f1dba3e6cd07f6d5522b"
 
 [[package]]
 name = "napi-derive"
@@ -1819,9 +1819,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.79"
+version = "1.0.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e8d9fa5c3b304765ce1fd9c4c8a3de2c8db365a5b91be52f186efc675681d95"
+checksum = "9b7ce2b32a1aed03c558dc61a5cd328f15aff2dbc17daad8fb8af04d2100e15c"
 dependencies = [
  "itoa",
  "ryu",
