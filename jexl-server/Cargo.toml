@@ -27,7 +27,7 @@ opentelemetry-prometheus = "0.10.0"
 prometheus = "0.13.0"
 serde = { version = "1.0.136", features = ["derive"] }
 utoipa = { version = "1.0.1", features = ["json", "serde_json"] }
-rayon = "1.5.2"
+rayon = "1.5.3"
 metrics = "0.18.1"
 metrics-exporter-prometheus = "0.9.0"
 tikv-jemallocator = "0.4.3"
