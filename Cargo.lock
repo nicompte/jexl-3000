@@ -751,19 +751,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jexl-3000-node"
-version = "0.0.0"
-dependencies = [
- "jexl-3000",
- "napi",
- "napi-build",
- "napi-derive",
- "rayon",
- "serde_json",
- "tikv-jemallocator",
-]
-
-[[package]]
 name = "jexl-eval"
 version = "0.1.7"
 dependencies = [
@@ -778,6 +765,19 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "jexl-node"
+version = "0.0.0"
+dependencies = [
+ "jexl-3000",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "rayon",
+ "serde_json",
+ "tikv-jemallocator",
 ]
 
 [[package]]
@@ -1088,9 +1088,9 @@ dependencies = [
 
 [[package]]
 name = "napi-build"
-version = "2.0.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6bba07d993e9865e6000062849a7644194be1b08c81968e7f02efd00e2dd49b"
+checksum = "ebd4419172727423cf30351406c54f6cc1b354a2cfb4f1dba3e6cd07f6d5522b"
 
 [[package]]
 name = "napi-derive"
@@ -2348,9 +2348,9 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "utoipa"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc99a1847e15c31b6f05c8d1f7fac5f67f2138e4e85ffad3ec0b33ff7ec0f016"
+checksum = "d40e50571a27124759c4288cea75bc72fa1f70a8b3946fce502d0a6485517359"
 dependencies = [
  "serde",
  "serde_json",
@@ -2359,9 +2359,9 @@ dependencies = [
 
 [[package]]
 name = "utoipa-gen"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d61feffc05a6847366e72c7ca3e760750ff3b8724170963a1d064bfda278b85c"
+checksum = "3532347b00922d3e9f0009939d4de65fdefbbf6d7a96f5408367bc4d4c060660"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
