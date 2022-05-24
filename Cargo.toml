@@ -4,9 +4,10 @@ members = [
     "jexl-eval",
     "jexl-node",
     "jexl-parser",
+    "jexl-python",
     "jexl-server",
-    "parser-gen",
     "jexl-wasm",
+    "parser-gen",
 ]
 exclude = [
     "jexl-serverless",
