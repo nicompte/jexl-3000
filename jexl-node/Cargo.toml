@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
-napi = { version = "2.3.3", default-features = false, features = ["napi4", "serde-json"] }
+napi = { version = "2.5.0", default-features = false, features = ["napi4", "serde-json"] }
 napi-derive = "2.4.1"
 jexl-3000 = { path = "../jexl-3000" }
 serde_json = "1.0.79"
