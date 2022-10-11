@@ -9,7 +9,7 @@ repository = "https://github.com/mozilla/jexl-rs"
 
 [dependencies]
 jexl-parser = { version = "^0.1.7-alpha.0", path = "../jexl-parser" }
-serde_json = "1.0.79"
+serde_json = "1.0.86"
 serde = "1.0.136"
 thiserror = "1.0.30"
 anyhow = "1.0.57"
