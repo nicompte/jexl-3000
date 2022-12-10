@@ -453,7 +453,8 @@ pub fn build_evaluator() -> Evaluator<'static> {
             let format = get_argument_string(v, 0)?;
             Ok(value!(chrono::NaiveDate::parse_from_str(date, format)
                 .context("failed to parse date")?
-                .and_hms(0, 0, 0)
+                .and_hms_opt(0, 0, 0)
+                .context("failed to add datetime")?
                 .timestamp()))
         })
         .with_transform("toDateTime", |v: &[Value]| {

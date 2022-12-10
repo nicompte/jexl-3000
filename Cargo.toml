@@ -5,10 +5,14 @@ members = [
     "jexl-node",
     "jexl-parser",
     "jexl-python",
-    "jexl-server",
     "jexl-wasm",
     "parser-gen",
 ]
 exclude = [
     "jexl-serverless",
 ]
+
+[workspace.dependencies]
+serde = "1.0"
+serde_json = "1.0"
+tikv-jemallocator = "0.5"

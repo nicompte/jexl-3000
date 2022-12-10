@@ -18,16 +18,14 @@ impl Evaluator {
         Evaluator(jexl_3000::build_evaluator())
     }
 
-    pub fn evaluate(&mut self, input: &str, context: &JsValue) -> Result<JsValue, JsValue> {
+    pub fn evaluate(&mut self, input: &str, context: JsValue) -> Result<JsValue, JsValue> {
         let context = if context.is_undefined() || context.is_null() {
             serde_json::json!({})
         } else {
-            context
-                .into_serde()
-                .map_err(|e| JsValue::from(e.to_string()))?
+            serde_wasm_bindgen::from_value(context).map_err(|e| JsValue::from(e.to_string()))?
         };
 
-        let evaluation = &self.0.eval_in_context(input, &context).map_err(|error| {
+        let evaluation = self.0.eval_in_context(input, &context).map_err(|error| {
             let cause = if let Some(source) = error.source() {
                 anyhow::Chain::new(source)
                     .map(|e| e.to_string())
@@ -41,10 +39,10 @@ impl Evaluator {
                 "caused_by": cause,
             });
 
-            JsValue::from_serde(&err).unwrap()
+            serde_wasm_bindgen::to_value(&err).unwrap()
         })?;
 
-        JsValue::from_serde(evaluation).map_err(|e| JsValue::from(e.to_string()))
+        serde_wasm_bindgen::to_value(&evaluation).map_err(|e| JsValue::from(e.to_string()))
     }
 }
 

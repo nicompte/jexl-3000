@@ -548,7 +548,9 @@ impl<'a> Evaluator<'a> {
                 })?;
                 let date =
                     NaiveDate::parse_from_str(date, format).context("failed to format date")?;
-                let date = date.and_hms(0, 0, 0);
+                let date = date
+                    .and_hms_opt(0, 0, 0)
+                    .context("failed to add datetime")?;
                 Ok(value!(date.timestamp()))
             }
             Expression::DateTime { datetime, format } => {
