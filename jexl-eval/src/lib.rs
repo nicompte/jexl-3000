@@ -218,11 +218,9 @@ impl<'a> Evaluator<'a> {
                 let index = self.eval_ast(index, context)?;
                 match index {
                     Value::String(inner) => {
-                        dbg!("ici");
                         Ok(subject.get(&inner).unwrap_or(&value!(null)).clone())
                     }
                     Value::Number(inner) => {
-                        dbg!("là");
                         if let Some(array) = subject.as_array() {
                             Ok(array
                                 .get(
