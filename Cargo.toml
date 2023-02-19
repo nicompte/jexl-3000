@@ -2,17 +2,18 @@
 members = [
     "jexl-3000",
     "jexl-eval",
-    "jexl-node",
+    # "jexl-node",
     "jexl-parser",
-    "jexl-python",
+    # "jexl-python",
     "jexl-wasm",
     "parser-gen",
 ]
-exclude = [
-    "jexl-serverless",
-]
+exclude = ["jexl-serverless", "jexl-node", "jexl-python"]
 
 [workspace.dependencies]
+regex = "1.7.1"
 serde = "1.0"
 serde_json = "1.0"
 tikv-jemallocator = "0.5"
+thiserror = "1.0.38"
+time = "0.3.19"

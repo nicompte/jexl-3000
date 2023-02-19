@@ -9,4 +9,4 @@ repository = "https://github.com/mozilla/jexl-rs"
 
 [dependencies]
 lalrpop-util = { version = "0.19.8", features = ["lexer"] }
-regex = "1.7.0"
+regex = "1.7.1"

@@ -2,8 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+pub type Location = (usize, usize);
+
 #[derive(Clone, Debug, PartialEq)]
-pub enum Expression {
+pub struct Expression {
+    pub expression: Expr,
+    pub location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Expr {
     Number(f64),
     String(String),
     Boolean(bool),
@@ -65,6 +73,7 @@ pub enum Expression {
         expression: Box<Expression>,
     },
     Now,
+    NowUtc,
     Date {
         date: Box<Expression>,
         format: Box<Expression>,

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::ast::{Expression, OpCode, UnCode, ExpressionTransform};
+use crate::ast::{Expression, Expr, OpCode, UnCode, ExpressionTransform};
 
 grammar;
 
@@ -13,104 +13,104 @@ match {
 pub Expression: Box<Expression> = Expr00;
 
 Expr00: Box<Expression> = {
-    <left: Expression> <operation: Op10> <right: Expr10> => Box::new(Expression::BinaryOperation { left, right, operation }),
+    <l:@L> <left: Expression> <operation: Op10> <right: Expr10> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
     Expr10,
 };
 
 Expr10: Box<Expression> = {
-    <left: Expr10> <operation: Op20> <right: Expr20> => Box::new(Expression::BinaryOperation { left, right, operation }),
+    <l:@L> <left: Expr10> <operation: Op20> <right: Expr20> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
     Expr20,
 };
 
 Expr20: Box<Expression> = {
-    <left: Expr20> <operation: Op30> <right: Expr30> => Box::new(Expression::BinaryOperation { left, right, operation }),
+    <l:@L> <left: Expr20> <operation: Op30> <right: Expr30> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
     Expr30,
 };
 
 Expr30: Box<Expression> = {
-    <left: Expr30> <operation: Op40> <right: Expr40> => Box::new(Expression::BinaryOperation { left, right, operation }),
+    <l:@L> <left: Expr30> <operation: Op40> <right: Expr40> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
     Expr40,
 };
 
 Expr40: Box<Expression> = {
-    <left: Expr40> <operation: Op50> <right: Expr50> => Box::new(Expression::BinaryOperation { left, right, operation }),
+    <l:@L> <left: Expr40> <operation: Op50> <right: Expr50> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
     Expr41,
 };
 
 Expr41: Box<Expression> = {
-    <operation: Un10> <right: Expr50> => Box::new(Expression::UnaryOperation { right, operation }),
+    <l:@L> <operation: Un10> <right: Expr50> <r:@R> => Box::new(Expression { expression: Expr::UnaryOperation { right, operation }, location: (l, r) }),
     Expr50,
 };
 
 Expr50: Box<Expression> = {
-    <left: Expr50> "?" <truthy: Expr60> ":" <falsy: Expr60> => Box::new(Expression::Conditional {left, truthy, falsy}),
+    <l:@L> <left: Expr50> "?" <truthy: Expr60> ":" <falsy: Expr60> <r:@R> => Box::new(Expression { expression: Expr::Conditional {left, truthy, falsy}, location: (l, r) }),
     Expr51,
 };
 
 Expr51: Box<Expression> = {
-    "if" <left: Expr51> "{" <truthy: Expr60> "}" "else" "{" <falsy: Expr60> "}" => Box::new(Expression::Conditional {left, truthy, falsy}),
+    <l:@L> "if" <left: Expr51> "{" <truthy: Expr60> "}" "else" "{" <falsy: Expr60> "}" <r:@R> => Box::new(Expression { expression: Expr::Conditional {left, truthy, falsy}, location: (l, r) }),
     Expr60,
 };
 
 Expr60: Box<Expression> = {
-    <subject: Expr60> "|" <name: Identifier> <args: Args?> => Box::new(Expression::Transform{name, subject, args}),
+    <l:@L> <subject: Expr60> "|" <name: Identifier> <args: Args?> <r:@R> => Box::new(Expression { expression: Expr::Transform{name, subject, args}, location: (l, r) }),
     Expr70
 };
 
 Expr70: Box<Expression> = {
-    <subject: Expr60>  "|" "mapTransform(" <name: Identifier> <args: Args?> ")" => Box::new(Expression::MapTransform {name, subject, args }),
+    <l:@L> <subject: Expr60>  "|" "mapTransform(" <name: Identifier> <args: Args?> ")" <r:@R> => Box::new(Expression { expression: Expr::MapTransform {name, subject, args }, location: (l, r) }),
     Expr80
 }
 
 Expr80: Box<Expression> = {
-    <subject: Expr60> "|" "filterTransform(" <name: Identifier> <args: Args?> ")" => Box::new(Expression::FilterTransform {name, subject, args }),
+    <l:@L> <subject: Expr60> "|" "filterTransform(" <name: Identifier> <args: Args?> ")" <r:@R> => Box::new(Expression { expression: Expr::FilterTransform {name, subject, args }, location: (l, r) }),
     Expr81
 }
 
 Expr81: Box<Expression> = {
-    <subject: Expr60>  "|" <name: ET> "(" <expression: Expression> ","? <args: Number?> ")" => Box::new(Expression::ExpressionTransform {name, subject, expression, args }),
+    <l:@L> <subject: Expr60>  "|" <name: ET> "(" <expression: Expression> ","? <args: Number?> ")" <r:@R> => Box::new(Expression { expression: Expr::ExpressionTransform {name, subject, expression, args }, location: (l, r) }),
     Expr82
 }
 
 Expr82: Box<Expression> = {
-    <subject: Expr60> "|" "reduce(" <init: Expression> "," <expression: Expression> ")" => Box::new(Expression::ReduceExpression { subject, init, expression }),
+    <l:@L> <subject: Expr60> "|" "reduce(" <init: Expression> "," <expression: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::ReduceExpression { subject, init, expression }, location: (l, r) }),
     Expr85
 }
 
 Expr85: Box<Expression> = {
-    "date(" <date: Expr85> "," <format: Expression> ")" => Box::new(Expression::Date { date, format }),
+    <l:@L> "date(" <date: Expr85> "," <format: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::Date { date, format }, location: (l, r) }),
     Expr86
 }
 
 Expr86: Box<Expression> = {
-    "datetime(" <datetime: Expr80> "," <format: Expression> ")" => Box::new(Expression::DateTime { datetime, format }),
+    <l:@L> "datetime(" <datetime: Expr80> "," <format: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::DateTime { datetime, format }, location: (l, r) }),
     Expr87
 }
 
 Expr87: Box<Expression> = {
-    "duration(" <duration: Expr80> "," <duration_type: Expression> ")" => Box::new(Expression::Duration { duration, duration_type }),
+    <l:@L> "duration(" <duration: Expr80> "," <duration_type: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::Duration { duration, duration_type }, location: (l, r) }),
     Expr88
 }
 
 Expr88: Box<Expression> = {
-   "$now" => Box::new(Expression::Now),
+    <l:@L> "$now" <r:@R> => Box::new(Expression { expression: Expr::Now, location: (l, r) }),
     Expr90
 }
 
 Expr90: Box<Expression> = {
-    <subject: Expr70> <index: Index> => Box::new(Expression::IndexOperation{subject, index}),
-    <subject: Expr70> "." <ident: Identifier>  => Box::new(Expression::DotOperation{subject, ident}),
+    <l:@L> <subject: Expr70> <index: Index> <r:@R> => Box::new(Expression { expression: Expr::IndexOperation{subject, index}, location: (l, r) }),
+    <l:@L> <subject: Expr70> "." <ident: Identifier> <r:@R> => Box::new(Expression { expression: Expr::DotOperation{subject, ident}, location: (l, r) }),
     Expr100
 };
 
 Expr100: Box<Expression> = {
-    Number => Box::new(Expression::Number(<>)),
-    Boolean => Box::new(Expression::Boolean(<>)),
-    String => Box::new(Expression::String(<>)),
-    Array => Box::new(Expression::Array(<>)),
-    Object => Box::new(Expression::Object(<>)),
-    Identifier => Box::new(Expression::Identifier(<>)),
-    Regex => Box::new(Expression::Regex(<>)),
+    <l:@L> <e:Number> <r:@R> => Box::new(Expression { expression: Expr::Number(e), location: (l, r) }),
+    <l:@L> <e:Boolean> <r:@R> => Box::new(Expression { expression: Expr::Boolean(e), location: (l, r) }),
+    <l:@L> <e:String> <r:@R> => Box::new(Expression { expression: Expr::String(e), location: (l, r) }),
+    <l:@L> <e:Array> <r:@R> => Box::new(Expression { expression: Expr::Array(e), location: (l, r) }),
+    <l:@L> <e:Object> <r:@R> => Box::new(Expression { expression: Expr::Object(e), location: (l, r) }),
+    <l:@L> <e:Identifier> <r:@R> => Box::new(Expression { expression: Expr::Identifier(e), location: (l, r) }),
+    <l:@L> <e:Regex> <r:@R> => Box::new(Expression { expression: Expr::Regex(e), location: (l, r) }),
     "(" <Expression> ")",
 };
 
@@ -189,7 +189,7 @@ Identifier: String = {
 }
 
 Index: Box<Expression> = {
-    "[" "." <ident: Identifier> <op: Op20> <right: Expr80> "]" => Box::new(Expression::Filter {ident, op, right}),
+    <l:@L> "[" "." <ident: Identifier> <op: Op20> <right: Expr80> "]" <r:@R> => Box::new(Expression { expression: Expr::Filter {ident, op, right}, location: (l, r) }),
     "[" <Expression> "]",
 }
 

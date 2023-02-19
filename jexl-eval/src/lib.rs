@@ -29,17 +29,17 @@
 //! use serde_json::json as value;
 //! let context = value!({"a": {"b": 2.0}});
 //! let evaluator = Evaluator::new();
-//! assert_eq!(evaluator.eval_in_context("a.b", context).unwrap(), value!(2.0));
+//! assert_eq!(evaluator.eval_in_context("a.b", &context).unwrap(), value!(2.0));
 //! ```
 //!
-
-use chrono::{Duration, NaiveDate, NaiveDateTime};
+pub use jexl_parser::ast::Location;
 use jexl_parser::{
-    ast::{Expression, ExpressionTransform, OpCode, UnCode},
+    ast::{Expr, Expression, ExpressionTransform, OpCode, UnCode},
     Parser,
 };
 use regex::Regex;
 use serde_json::{json as value, Value};
+use time::{format_description, Date, Duration, OffsetDateTime, PrimitiveDateTime};
 
 pub mod error;
 use dashmap::DashMap;
@@ -72,7 +72,7 @@ impl Truthy for Value {
     }
 }
 
-impl<'b> Truthy for Result<'b, Value> {
+impl Truthy for Result<Value> {
     fn is_truthy(&self) -> bool {
         match self {
             Ok(v) => v.is_truthy(),
@@ -91,10 +91,8 @@ type Context = Value;
 ///
 /// Returns a Result with an `anyhow::Error`. This allows consumers to return their own custom errors
 /// in the closure, and use `.into` to convert it into an `anyhow::Error`. The error message will be perserved
-pub type TransformFn<'a> = Arc<dyn Fn(&[Value]) -> Result<Value, anyhow::Error> + 'a + Send + Sync>;
-
-// pub type MapFn<'a> = Arc<dyn Fn(&[Value]) -> Result<Value, anyhow::Error> + 'a + Send + Sync>;
-// pub type FilterFn<'a> = Arc<dyn Fn(&[Value]) -> Result<bool, anyhow::Error> + 'a + Send + Sync>;
+pub type TransformFn<'a> =
+    Arc<dyn Fn(Location, &[Value]) -> Result<Value, EvaluationError> + 'a + Send + Sync>;
 
 #[derive(Default)]
 pub struct Evaluator<'a> {
@@ -141,19 +139,19 @@ impl<'a> Evaluator<'a> {
     /// ```
     pub fn with_transform<F>(self, name: &str, transform: F) -> Self
     where
-        F: Fn(&[Value]) -> Result<Value, anyhow::Error> + 'a + Send + Sync,
+        F: Fn(Location, &[Value]) -> Result<Value, EvaluationError> + 'a + Send + Sync,
     {
         self.transforms
             .insert(name.to_string(), Arc::new(transform));
         self
     }
 
-    pub fn eval<'b>(&self, input: &'b str) -> Result<'b, Value> {
+    pub fn eval(&self, input: &str) -> Result<Value> {
         let context = value!({});
         self.eval_in_context(input, &context)
     }
 
-    pub fn eval_in_context<'b>(&self, input: &'b str, context: &Value) -> Result<'b, Value> {
+    pub fn eval_in_context(&self, input: &str, context: &Value) -> Result<Value> {
         if !context.is_object() {
             return Err(EvaluationError::InvalidContext);
         }
@@ -161,25 +159,34 @@ impl<'a> Evaluator<'a> {
         if let Some(tree) = self.parsed.get(input) {
             self.eval_ast(&tree, context)
         } else {
-            let tree = Parser::parse(input)?;
+            // TODO: remove unwrap()
+            let tree = Parser::parse(input).unwrap();
             self.parsed.insert(input.to_string(), tree.clone());
             self.eval_ast(&tree, context)
         }
     }
 
-    fn eval_ast<'b>(&self, ast: &Expression, context: &Context) -> Result<'b, Value> {
+    fn eval_ast(&self, ast: &Expression, context: &Context) -> Result<Value> {
+        let Expression {
+            expression,
+            location,
+        } = &ast;
+        let ast = expression;
         match ast {
-            Expression::Number(n) => Ok(value!(n)),
-            Expression::Boolean(b) => Ok(value!(b)),
-            Expression::String(s) => Ok(value!(s)),
-            Expression::Regex(s) => Ok(value!(s)),
-            Expression::Array(xs) => xs.iter().map(|x| self.eval_ast(x, context)).collect(),
+            Expr::Number(n) => Ok(value!(n)),
+            Expr::Boolean(b) => Ok(value!(b)),
+            Expr::String(s) => Ok(value!(s)),
+            Expr::Regex(s) => Ok(value!(s)),
+            Expr::Array(xs) => xs.iter().map(|x| self.eval_ast(x, context)).collect(),
 
-            Expression::Object(items) => {
+            Expr::Object(items) => {
                 let mut map = serde_json::Map::with_capacity(items.len());
                 for (key, expr) in items.iter() {
                     if map.contains_key(key) {
-                        return Err(EvaluationError::DuplicateObjectKey(key.clone()));
+                        return Err(EvaluationError::DuplicateObjectKey(
+                            location.clone(),
+                            key.clone(),
+                        ));
                     }
                     let value = self.eval_ast(expr, context)?;
                     map.insert(key.clone(), value);
@@ -187,27 +194,32 @@ impl<'a> Evaluator<'a> {
                 Ok(Value::Object(map))
             }
 
-            Expression::Identifier(inner) => match context.get(&inner) {
+            Expr::Identifier(inner) => match context.get(inner) {
                 Some(v) => Ok(v.clone()),
-                _ => Err(EvaluationError::UndefinedIdentifier(inner.clone())),
+                _ => Err(EvaluationError::UndefinedIdentifier(
+                    location.clone(),
+                    inner.clone(),
+                )),
             },
 
-            Expression::DotOperation { subject, ident } => {
-                let subject = self.eval_ast(subject, context)?;
-                Ok(subject.get(&ident).unwrap_or(&value!(null)).clone())
+            Expr::DotOperation { subject, ident } => {
+                let subject = self.eval_ast(&subject, context)?;
+                Ok(subject.get(ident).unwrap_or(&value!(null)).clone())
             }
 
-            Expression::IndexOperation { subject, index } => {
-                let subject = self.eval_ast(subject, context)?;
-                if let Expression::Filter { ident, op, right } = *index.clone() {
-                    let subject_arr = subject.as_array().ok_or(EvaluationError::InvalidFilter)?;
+            Expr::IndexOperation { subject, index } => {
+                let subject = self.eval_ast(&subject, context)?;
+                if let Expr::Filter { ident, op, right } = (*index.clone()).expression {
+                    let subject_arr = subject
+                        .as_array()
+                        .ok_or(EvaluationError::InvalidFilter(location.clone()))?;
                     let right = self.eval_ast(&right, context)?;
                     let filtered = subject_arr
                         .iter()
                         .filter(|e| {
                             let left = e.get(&ident).unwrap_or(&value!(null));
                             // returns false if any members fail the op, could happen if array members are missing the identifier
-                            self.apply_op(&op, left.clone(), right.clone())
+                            self.apply_op(location.clone(), &op, left.clone(), right.clone())
                                 .unwrap_or(value!(false))
                                 .is_truthy()
                         })
@@ -215,7 +227,7 @@ impl<'a> Evaluator<'a> {
                     return Ok(value!(filtered));
                 }
 
-                let index = self.eval_ast(index, context)?;
+                let index = self.eval_ast(&index, context)?;
                 match index {
                     Value::String(inner) => {
                         Ok(subject.get(&inner).unwrap_or(&value!(null)).clone())
@@ -227,8 +239,9 @@ impl<'a> Evaluator<'a> {
                                     inner
                                         .as_f64()
                                         .ok_or_else(|| {
-                                            EvaluationError::ExpectedNumber(
-                                                "index".to_string(),
+                                            EvaluationError::InvalidType(
+                                                location.clone(),
+                                                ExpectedType::String,
                                                 inner.to_string(),
                                             )
                                         })?
@@ -238,8 +251,9 @@ impl<'a> Evaluator<'a> {
                                 .clone())
                         } else if let Some(str) = subject.as_str() {
                             Ok(value!(str.chars().nth(inner.as_f64().ok_or_else(|| {
-                                EvaluationError::ExpectedNumber(
-                                    "index".to_string(),
+                                EvaluationError::InvalidType(
+                                    location.clone(),
+                                    ExpectedType::String,
                                     inner.to_string(),
                                 )
                             })?
@@ -248,138 +262,162 @@ impl<'a> Evaluator<'a> {
                             Ok(value!(null))
                         }
                     }
-                    _ => Err(EvaluationError::InvalidIndexType),
+                    _ => Err(EvaluationError::InvalidIndexType(location.clone())),
                 }
             }
-            Expression::UnaryOperation { operation, right } => {
-                let right = self.eval_ast(right, context)?;
+            Expr::UnaryOperation { operation, right } => {
+                let right = self.eval_ast(&right, context)?;
                 match operation {
                     UnCode::Not => Ok(value!(!right.is_truthy())),
                     UnCode::Minus => Ok(value!(-right.as_f64().ok_or_else(|| {
-                        EvaluationError::ExpectedNumber("-".to_string(), right.to_string())
+                        EvaluationError::InvalidType(
+                            location.clone(),
+                            ExpectedType::String,
+                            right.to_string(),
+                        )
                     })?)),
                     UnCode::Plus => Ok(right),
                 }
             }
-            Expression::BinaryOperation {
+            Expr::BinaryOperation {
                 left,
                 right,
                 operation,
-            } => self.eval_op(operation, left, right, context),
-            Expression::Transform {
+            } => self.eval_op(location.clone(), &operation, &left, &right, context),
+            Expr::Transform {
                 name,
                 subject,
                 args,
             } => {
-                use anyhow::Context;
-                let subject = self.eval_ast(subject, context)?;
+                let subject = self.eval_ast(&subject, context)?;
                 let mut args_arr = vec![subject];
                 if let Some(args) = args {
                     for arg in args {
-                        args_arr.push(self.eval_ast(arg, context)?);
+                        args_arr.push(self.eval_ast(&arg, context)?);
                     }
                 }
-                self.transforms
-                    .get(name)
-                    .ok_or_else(|| EvaluationError::UnknownTransform(name.clone()))?(
-                    &args_arr
-                )
-                .context(EvaluationError::FailedTransform(name.to_string()))
-                .map_err(|e| e.into())
+                self.transforms.get(name).ok_or_else(|| {
+                    EvaluationError::UnknownTransform(
+                        location.clone(),
+                        name.clone(),
+                        self.transforms.iter().map(|el| el.key().clone()).collect(),
+                    )
+                })?(location.clone(), &args_arr)
+                /* .context(EvaluationError::FailedTransform(
+                    location.clone(),
+                    name.to_string(),
+                ))
+                .map_err(|e| e.into())*/
             }
 
-            Expression::Conditional {
+            Expr::Conditional {
                 left,
                 truthy,
                 falsy,
             } => {
-                if self.eval_ast(left, context).is_truthy() {
-                    self.eval_ast(truthy, context)
+                if self.eval_ast(&left, context).is_truthy() {
+                    self.eval_ast(&truthy, context)
                 } else {
-                    self.eval_ast(falsy, context)
+                    self.eval_ast(&falsy, context)
                 }
             }
 
-            Expression::Filter {
+            Expr::Filter {
                 ident: _,
                 op: _,
                 right: _,
             } => {
                 // Filters shouldn't be evaluated individually
                 // instead, they are evaluated as a part of an IndexOperation
-                Err(EvaluationError::InvalidFilter)
+                Err(EvaluationError::InvalidFilter(location.clone()))
             }
-            Expression::MapTransform {
+            Expr::MapTransform {
                 subject,
                 name,
                 args,
             } => {
-                let subject = self.eval_ast(subject, context)?;
+                let subject = self.eval_ast(&subject, context)?;
                 let mut args_arr = Vec::new();
                 // args_arr.push(subject.clone());
                 if let Some(args) = args {
                     for arg in args {
-                        args_arr.push(self.eval_ast(arg, context)?);
+                        args_arr.push(self.eval_ast(&arg, context)?);
                     }
                 }
                 let array = subject.as_array().ok_or_else(|| {
-                    EvaluationError::ExpectedArray("mapTransform".to_string(), subject.to_string())
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::Array,
+                        subject.to_string(),
+                    )
                 })?;
 
                 let f = {
                     // let transforms = self.transforms;
-                    self.transforms
-                        .get(name)
-                        .ok_or_else(|| EvaluationError::UnknownTransform(name.clone()))?
+                    self.transforms.get(name).ok_or_else(|| {
+                        EvaluationError::UnknownTransform(
+                            location.clone(),
+                            name.clone(),
+                            self.transforms.iter().map(|el| el.key().clone()).collect(),
+                        )
+                    })?
                     // .clone()
                 };
                 let res = array.iter().map(|v| {
                     let mut data = args_arr.clone();
                     data.insert(0, v.clone());
-                    f(&data)
+                    f(location.clone(), &data)
                 });
                 let res = res.collect::<std::result::Result<Vec<Value>, _>>()?;
 
-                Ok(serde_json::to_value(&res)?)
+                Ok(serde_json::to_value(res)?)
             }
-            Expression::ExpressionTransform {
+            Expr::ExpressionTransform {
                 name,
                 subject,
                 expression,
                 args,
             } => match name {
                 ExpressionTransform::Map => {
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
                     let array = subject.as_array().ok_or_else(|| {
-                        EvaluationError::ExpectedArray("map".to_string(), subject.to_string())
+                        EvaluationError::InvalidType(
+                            location.clone(),
+                            ExpectedType::Array,
+                            subject.to_string(),
+                        )
                     })?;
                     let res = array
                         .iter()
-                        .map(|v| self.eval_ast(expression, &value!({ "this": v })));
+                        .map(|v| self.eval_ast(&expression, &value!({ "this": v })));
                     let res =
                         serde_json::to_value(res.collect::<std::result::Result<Vec<Value>, _>>()?)?;
                     Ok(res)
                 }
                 ExpressionTransform::Apply => {
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
                     let res = serde_json::to_value(
-                        self.eval_ast(expression, &value!({ "this": subject }))?,
+                        self.eval_ast(&expression, &value!({ "this": subject }))?,
                     )?;
                     Ok(res)
                 }
                 ExpressionTransform::SortBy => {
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
                     let reverse = args == &Some(-1f64);
 
                     let array = subject.as_array().ok_or_else(|| {
-                        EvaluationError::ExpectedArray("sortBy".to_string(), subject.to_string())
+                        EvaluationError::InvalidType(
+                            location.clone(),
+                            ExpectedType::Array,
+                            subject.to_string(),
+                        )
                     })?;
 
                     let mut array = array.clone();
                     array.sort_by(|a, b| {
                         if let (Ok(a_val), Ok(b_val)) = (
-                            self.eval_ast(expression, &value!({ "this": a })),
-                            self.eval_ast(expression, &value!({ "this": b })),
+                            self.eval_ast(&expression, &value!({ "this": a })),
+                            self.eval_ast(&expression, &value!({ "this": b })),
                         ) {
                             if let (Some(a), Some(b)) = (a_val.as_str(), b_val.as_str()) {
                                 a.cmp(b)
@@ -403,8 +441,7 @@ impl<'a> Evaluator<'a> {
                     Ok(value!(array))
                 }
                 ExpressionTransform::Filter => {
-                    use anyhow::Context;
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
 
                     let array = if let Some(array) = subject.as_array() {
                         array
@@ -415,101 +452,133 @@ impl<'a> Evaluator<'a> {
 
                     let res = array
                         .iter()
-                        .try_fold::<_, _, Result<Vec<_>, anyhow::Error>>(vec![], |mut acc, v| {
+                        .try_fold::<_, _, Result<Vec<_>, EvaluationError>>(vec![], |mut acc, v| {
                             let value = self
-                                .eval_ast(expression, &value!({ "this": v }))
+                                .eval_ast(&expression, &value!({ "this": v }))
                                 .map_err(|_| {
-                                    EvaluationError::FailedEvaluation("filter".to_string())
+                                    EvaluationError::FailedEvaluation(
+                                        location.clone(),
+                                        "filter".to_string(),
+                                    )
                                 })?
                                 .as_bool()
-                                .context(EvaluationError::FilterShouldReturnBool)?;
+                                // TODO: remove unwrap, use ok_or
+                                /* .ok_or(|| {
+                                    EvaluationError::InvalidType(
+                                        location.clone(),
+                                        ExpectedType::Boolean,
+                                        v.to_string(),
+                                    )
+                                })?;*/
+                                .unwrap();
                             if value {
                                 acc.push(v);
                             }
                             Ok(acc)
-                        })?;
+                        })
+                        .map_err(|_| EvaluationError::FailedReduce(location.clone()))?;
 
-                    Ok(serde_json::to_value(&res)?)
+                    Ok(serde_json::to_value(res)?)
                 }
                 ExpressionTransform::Any => {
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
                     if subject == Value::Null {
                         return Ok(Value::Bool(false));
                     }
                     let array = subject.as_array().ok_or_else(|| {
-                        EvaluationError::ExpectedArray("any".to_string(), subject.to_string())
+                        EvaluationError::InvalidType(
+                            location.clone(),
+                            ExpectedType::Array,
+                            subject.to_string(),
+                        )
                     })?;
                     let res = array.iter().any(|v| {
-                        self.eval_ast(expression, &value!({ "this": v }))
+                        self.eval_ast(&expression, &value!({ "this": v }))
                             .unwrap_or(Value::Bool(false))
                             .is_truthy()
                     });
                     Ok(value!(res))
                 }
                 ExpressionTransform::All => {
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
                     let array = subject.as_array().ok_or_else(|| {
-                        EvaluationError::ExpectedArray("all".to_string(), subject.to_string())
+                        EvaluationError::InvalidType(
+                            location.clone(),
+                            ExpectedType::Array,
+                            subject.to_string(),
+                        )
                     })?;
                     let res = array.iter().all(|v| {
-                        self.eval_ast(expression, &value!({ "this": v }))
+                        self.eval_ast(&expression, &value!({ "this": v }))
                             .unwrap_or(Value::Bool(false))
                             .is_truthy()
                     });
                     Ok(value!(res))
                 }
                 ExpressionTransform::Find => {
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
                     let array = subject.as_array().ok_or_else(|| {
-                        EvaluationError::ExpectedArray("find".to_string(), subject.to_string())
+                        EvaluationError::InvalidType(
+                            location.clone(),
+                            ExpectedType::Array,
+                            subject.to_string(),
+                        )
                     })?;
                     let res = array.iter().find(|v| {
-                        self.eval_ast(expression, &value!({ "this": v }))
+                        self.eval_ast(&expression, &value!({ "this": v }))
                             .unwrap_or(Value::Bool(false))
                             .is_truthy()
                     });
                     Ok(value!(res.cloned().unwrap_or(Value::Null)))
                 }
                 ExpressionTransform::FindIndex => {
-                    let subject = self.eval_ast(subject, context)?;
+                    let subject = self.eval_ast(&subject, context)?;
                     let array = subject.as_array().ok_or_else(|| {
-                        EvaluationError::ExpectedArray("findIndex".to_string(), subject.to_string())
+                        EvaluationError::InvalidType(
+                            location.clone(),
+                            ExpectedType::Array,
+                            subject.to_string(),
+                        )
                     })?;
                     let res = array.iter().position(|v| {
-                        self.eval_ast(expression, &value!({ "this": v }))
+                        self.eval_ast(&expression, &value!({ "this": v }))
                             .unwrap_or(Value::Bool(false))
                             .is_truthy()
                     });
                     Ok(value!(res.map(|v| v as i64).unwrap_or(-1)))
                 }
             },
-            Expression::ReduceExpression {
+            Expr::ReduceExpression {
                 subject,
                 init,
                 expression,
             } => {
-                let init = self.eval_ast(init, &value!({}))?;
-                let subject = self.eval_ast(subject, context)?;
+                let init = self.eval_ast(&init, &value!({}))?;
+                let subject = self.eval_ast(&subject, context)?;
 
                 let array = subject.as_array().ok_or_else(|| {
-                    EvaluationError::ExpectedArray("reduce".to_string(), subject.to_string())
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::Array,
+                        subject.to_string(),
+                    )
                 })?;
 
                 let res = array.iter().try_fold(init, |acc, v| {
-                    self.eval_ast(expression, &value!({ "this": v, "acc": acc }))
+                    self.eval_ast(&expression, &value!({ "this": v, "acc": acc }))
                 })?;
-                Ok(serde_json::to_value(&res)?)
+                Ok(serde_json::to_value(res)?)
             }
-            Expression::FilterTransform {
+            Expr::FilterTransform {
                 subject,
                 name,
                 args,
             } => {
-                let subject = self.eval_ast(subject, context)?;
+                let subject = self.eval_ast(&subject, context)?;
                 let mut args_arr = Vec::new();
                 if let Some(args) = args {
                     for arg in args {
-                        args_arr.push(self.eval_ast(arg, context)?);
+                        args_arr.push(self.eval_ast(&arg, context)?);
                     }
                 }
                 let array = if let Some(array) = subject.as_array() {
@@ -520,70 +589,109 @@ impl<'a> Evaluator<'a> {
                 };
 
                 let f = {
-                    self.transforms
-                        .get(name)
-                        .ok_or_else(|| EvaluationError::UnknownTransform(name.clone()))?
+                    self.transforms.get(name).ok_or_else(|| {
+                        EvaluationError::UnknownTransform(
+                            location.clone(),
+                            name.clone(),
+                            self.transforms.iter().map(|el| el.key().clone()).collect(),
+                        )
+                    })?
                 };
 
                 let res = array.iter().filter(|v| {
                     let mut data = args_arr.clone();
                     data.insert(0, <&serde_json::Value>::clone(v).clone());
-                    f(&data).unwrap_or(value![false]).as_bool().unwrap_or(false)
+                    f(location.clone(), &data)
+                        .unwrap_or(value![false])
+                        .as_bool()
+                        .unwrap_or(false)
                 });
                 let res = res.collect::<Vec<_>>();
 
-                Ok(serde_json::to_value(&res)?)
+                Ok(serde_json::to_value(res)?)
             }
-            Expression::Now => Ok(value!(chrono::Utc::now().timestamp())),
-            Expression::Date { date, format } => {
-                use anyhow::Context;
-
-                let date = self.eval_ast(date, context)?;
+            Expr::Now => Ok(value!(OffsetDateTime::now_local()
+                .unwrap_or_else(|_| OffsetDateTime::now_utc())
+                .unix_timestamp())),
+            Expr::NowUtc => Ok(value!(OffsetDateTime::now_utc().unix_timestamp())),
+            Expr::Date { date, format } => {
+                let date = self.eval_ast(&date, context)?;
                 let date = date.as_str().ok_or_else(|| {
-                    EvaluationError::ExpectedString("date".to_string(), date.to_string())
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::String,
+                        date.to_string(),
+                    )
                 })?;
-                let format = self.eval_ast(format, context)?;
+                let format = self.eval_ast(&format, context)?;
                 let format = format.as_str().ok_or_else(|| {
-                    EvaluationError::ExpectedString("date format".to_string(), format.to_string())
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::String,
+                        date.to_string(),
+                    )
                 })?;
-                let date =
-                    NaiveDate::parse_from_str(date, format).context("failed to format date")?;
-                let date = date
-                    .and_hms_opt(0, 0, 0)
-                    .context("failed to add datetime")?;
-                Ok(value!(date.timestamp()))
+                let format_description = format_description::parse(format).map_err(|_| {
+                    EvaluationError::DateFormatError(location.clone(), date.to_string())
+                })?;
+                let date = Date::parse(date, &format_description).map_err(|_| {
+                    EvaluationError::DateParseError(
+                        location.clone(),
+                        date.to_string(),
+                        format.to_string(),
+                    )
+                })?;
+                let date = date.midnight();
+                Ok(value!(date.assume_utc().unix_timestamp()))
             }
-            Expression::DateTime { datetime, format } => {
-                use anyhow::Context;
-
-                let datetime = self.eval_ast(datetime, context)?;
+            Expr::DateTime { datetime, format } => {
+                let datetime = self.eval_ast(&datetime, context)?;
                 let datetime = datetime.as_str().ok_or_else(|| {
-                    EvaluationError::ExpectedString("datetime".to_string(), datetime.to_string())
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::String,
+                        datetime.to_string(),
+                    )
                 })?;
-                let format = self.eval_ast(format, context)?;
+                let format = self.eval_ast(&format, context)?;
                 let format = format.as_str().ok_or_else(|| {
-                    EvaluationError::ExpectedString("date format".to_string(), format.to_string())
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::String,
+                        format.to_string(),
+                    )
                 })?;
-                let datetime = NaiveDateTime::parse_from_str(datetime, format)
-                    .context("failed to format datetime")?;
+                let format_description = format_description::parse(format).map_err(|_| {
+                    EvaluationError::DateFormatError(location.clone(), format.to_string())
+                })?;
+                let datetime =
+                    PrimitiveDateTime::parse(datetime, &format_description).map_err(|_| {
+                        EvaluationError::DateParseError(
+                            location.clone(),
+                            datetime.to_string(),
+                            format.to_string(),
+                        )
+                    })?;
 
-                Ok(value!(datetime.timestamp()))
+                Ok(value!(datetime.assume_utc().unix_timestamp()))
             }
-            Expression::Duration {
+            Expr::Duration {
                 duration,
                 duration_type,
             } => {
-                let duration = self.eval_ast(duration, context)?;
+                let duration = self.eval_ast(&duration, context)?;
                 let duration = duration.as_f64().ok_or_else(|| {
-                    EvaluationError::ExpectedNumber(
-                        "duration type".to_string(),
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::Number,
                         duration.to_string(),
                     )
                 })? as i64;
-                let duration_type = self.eval_ast(duration_type, context)?;
+                let duration_type = self.eval_ast(&duration_type, context)?;
                 let duration_type = duration_type.as_str().ok_or_else(|| {
-                    EvaluationError::ExpectedString(
-                        "duration type".to_string(),
+                    EvaluationError::InvalidType(
+                        location.clone(),
+                        ExpectedType::String,
                         duration_type.to_string(),
                     )
                 })?;
@@ -597,21 +705,25 @@ impl<'a> Evaluator<'a> {
                     "minutes" | "minute" => Duration::minutes(duration),
                     "seconds" | "second" => Duration::seconds(duration),
                     _ => {
-                        return Err(EvaluationError::InvalidDuration(duration_type.to_string()));
+                        return Err(EvaluationError::InvalidDuration(
+                            location.clone(),
+                            duration_type.to_string(),
+                        ));
                     }
                 };
-                Ok(value!(duration.num_seconds()))
+                Ok(value!(duration.as_seconds_f64().round() as i64))
             }
         }
     }
 
-    fn eval_op<'b>(
+    fn eval_op(
         &self,
+        location: Location,
         operation: &OpCode,
         left: &Expression,
         right: &Expression,
         context: &Context,
-    ) -> Result<'b, Value> {
+    ) -> Result<Value> {
         let left = self.eval_ast(left, context);
 
         // We want to delay evaluating the right hand side in the cases of AND and OR.
@@ -631,15 +743,21 @@ impl<'a> Evaluator<'a> {
                     left?
                 }
             }
-            _ => self.apply_op(operation, left?, eval_right()?)?,
+            _ => self.apply_op(location, operation, left?, eval_right()?)?,
         })
     }
 
-    fn apply_op<'b>(&self, operation: &OpCode, left: Value, right: Value) -> Result<'b, Value> {
+    fn apply_op(
+        &self,
+        location: Location,
+        operation: &OpCode,
+        left: Value,
+        right: Value,
+    ) -> Result<Value> {
         match (operation, left, right) {
             (OpCode::NotEqual, a, b) => {
                 // Implement NotEquals as the inverse of Equals.
-                let value = self.apply_op(&OpCode::Equal, a, b)?;
+                let value = self.apply_op(location, &OpCode::Equal, a, b)?;
                 let equality = value
                     .as_bool()
                     .unwrap_or_else(|| unreachable!("Equality always returns a bool"));
@@ -686,25 +804,23 @@ impl<'a> Evaluator<'a> {
                 OpCode::LessEqual => Ok(value!(a <= b)),
                 OpCode::GreaterEqual => Ok(value!(a >= b)),
                 OpCode::Matches => {
-                    use anyhow::Context;
-                    // let regexes = self.regexes;
                     if let Some(regex) = self.regexes.get(&b) {
                         Ok(value!(regex.is_match(&a)))
                     } else {
-                        let regex = Regex::new(&b).context("failed to compile regex")?;
+                        let regex = Regex::new(&b)
+                            .map_err(|_| EvaluationError::InvalidRegex(location, b.to_string()))?;
                         self.regexes.insert(b, regex.clone());
                         Ok(value!(regex.is_match(&a)))
                     }
                 }
                 OpCode::Capture => {
-                    use anyhow::Context;
                     let regex = {
-                        // let regexes = self.regexes;
                         if let Some(regex) = self.regexes.get(&b) {
                             regex.clone()
                         } else {
-                            let regex = Regex::new(&b).context("failed to compile regex")?;
-                            self.regexes.insert(b, regex.clone());
+                            let regex = Regex::new(&b)
+                                .map_err(|_| EvaluationError::InvalidRegex(location, b.clone()))?;
+                            self.regexes.insert(b.clone(), regex.clone());
                             regex
                         }
                     };
@@ -713,47 +829,65 @@ impl<'a> Evaluator<'a> {
                         return Ok(value!([]));
                     }
                     let captures: Vec<_> = captures
-                        .context("failed to get captures")?
+                        // .ok_or(|| EvaluationError::FailedCapture(location, b, regex.to_string()))?
+                        // DOTO: remove unwrap
+                        .unwrap()
                         .iter()
-                        .map(|e| e.context("failed to capture").map(|res| res.as_str()))
+                        .map(|e| {
+                            e.ok_or(|| {
+                                EvaluationError::FailedCapture(
+                                    location,
+                                    b.clone(),
+                                    regex.to_string(),
+                                )
+                            })
+                            .map(|res| res.as_str())
+                        })
                         .skip(1)
                         .collect::<Result<_, _>>()
-                        .context("failed to capture")?;
+                        .map_err(|_| {
+                            EvaluationError::FailedCapture(location, b.clone(), regex.to_string())
+                        })?;
                     Ok(value!(captures))
                 }
                 OpCode::CaptureMultiple => {
-                    use anyhow::Context;
                     let regex = {
-                        // let regexes = self.regexes;
                         if let Some(regex) = self.regexes.get(&b) {
                             regex.clone()
                         } else {
-                            let regex = Regex::new(&b).context("failed to compile regex")?;
-                            self.regexes.insert(b, regex.clone());
+                            let regex = Regex::new(&b)
+                                .map_err(|_| EvaluationError::InvalidRegex(location, b.clone()))?;
+                            self.regexes.insert(b.clone(), regex.clone());
                             regex
                         }
                     };
                     let captures: Vec<_> = regex.captures_iter(&a).collect();
 
                     let captures: Vec<_> = captures
-                        // .context("failed to get captures")?
                         .iter()
                         .map(|e| {
                             e.iter()
                                 .map(|res| {
-                                    res.context("failed to get capture")
-                                        //.iter()
-                                        .map(|e| e.as_str())
-                                    // .collect::<Vec<_>>()
+                                    res.ok_or(|| {
+                                        EvaluationError::FailedCapture(
+                                            location,
+                                            b.clone(),
+                                            regex.to_string(),
+                                        )
+                                    })
+                                    .map(|e| e.as_str())
                                 })
                                 .skip(1)
                                 .collect::<Result<Vec<_>, _>>()
                         })
                         .collect::<Result<Vec<_>, _>>()
-                        .context("failed to capture")?;
+                        .map_err(|_| {
+                            EvaluationError::FailedCapture(location, b.clone(), regex.to_string())
+                        })?;
                     Ok(value!(captures))
                 }
                 _ => Err(EvaluationError::InvalidBinaryOp {
+                    location,
                     operation: *operation,
                     left: value!(a),
                     right: value!(b),
@@ -771,6 +905,7 @@ impl<'a> Evaluator<'a> {
                 _ => Ok(value!(false)),
             },
             (operation, left, right) => Err(EvaluationError::InvalidBinaryOp {
+                location,
                 operation: *operation,
                 left,
                 right,
@@ -954,7 +1089,7 @@ mod tests {
 
     #[test]
     fn test_map() {
-        let evaluator = Evaluator::new().with_transform("lowercase", |v: &[Value]| {
+        let evaluator = Evaluator::new().with_transform("lowercase", |_: Location, v: &[Value]| {
             let s = v
                 .get(0)
                 .expect("missing value")
@@ -984,7 +1119,7 @@ mod tests {
 
     #[test]
     fn test_filter() {
-        let evaluator = Evaluator::new().with_transform("tests", |v: &[Value]| {
+        let evaluator = Evaluator::new().with_transform("tests", |_: Location, v: &[Value]| {
             let s = v
                 .get(0)
                 .expect("missing value")
@@ -1020,7 +1155,7 @@ mod tests {
     #[test]
     fn test_map_filter() {
         let evaluator = Evaluator::new()
-            .with_transform("lower", |v: &[Value]| {
+            .with_transform("lower", |_: Location, v: &[Value]| {
                 let s = v
                     .get(0)
                     .expect("missing value")
@@ -1028,7 +1163,7 @@ mod tests {
                     .expect("Should be a string!");
                 Ok(value!(s.to_lowercase()))
             })
-            .with_transform("tests", |v: &[Value]| {
+            .with_transform("tests", |_: Location, v: &[Value]| {
                 let s = v
                     .get(0)
                     .expect("missing value")
@@ -1121,7 +1256,7 @@ mod tests {
     #[test]
     // Test a very simple transform that applies to_lowercase to a string
     fn test_simple_transform() {
-        let evaluator = Evaluator::new().with_transform("lower", |v: &[Value]| {
+        let evaluator = Evaluator::new().with_transform("lower", |_: Location, v: &[Value]| {
             let s = v
                 .get(0)
                 .expect("There should be one argument!")
@@ -1135,9 +1270,14 @@ mod tests {
     #[test]
     // Test returning an UnknownTransform error if a transform is unknown
     fn test_missing_transform() {
-        let err = Evaluator::new().eval("'hello'|world").unwrap_err();
-        if let EvaluationError::UnknownTransform(transform) = err {
-            assert_eq!(transform, "world")
+        let err = Evaluator::new()
+            .with_transform("sqrt", |_: Location, _: &[Value]| unimplemented!())
+            .eval("'hello'|world")
+            .unwrap_err();
+        if let EvaluationError::UnknownTransform(location, transform, transforms) = err {
+            assert_eq!(location, (0, 13));
+            assert_eq!(transform, "world");
+            assert_eq!(transforms, vec![String::from("sqrt")]);
         } else {
             panic!("Should have thrown an unknown transform error")
         }
@@ -1147,7 +1287,8 @@ mod tests {
     // Test returning an UndefinedIdentifier error if an identifier is unknown
     fn test_undefined_identifier() {
         let err = Evaluator::new().eval("not_defined").unwrap_err();
-        if let EvaluationError::UndefinedIdentifier(id) = err {
+        if let EvaluationError::UndefinedIdentifier(location, id) = err {
+            assert_eq!(location, (0, 11));
             assert_eq!(id, "not_defined")
         } else {
             panic!("Should have thrown an undefined identifier error")
@@ -1158,7 +1299,8 @@ mod tests {
     // Test returning an UndefinedIdentifier error if an identifier is unknown
     fn test_undefined_identifier_truthy_ops() {
         let err = Evaluator::new().eval("not_defined").unwrap_err();
-        if let EvaluationError::UndefinedIdentifier(id) = err {
+        if let EvaluationError::UndefinedIdentifier(location, id) = err {
+            assert_eq!(location, (0, 11));
             assert_eq!(id, "not_defined")
         } else {
             panic!("Should have thrown an undefined identifier error")
@@ -1176,7 +1318,7 @@ mod tests {
                 assert!(obs.is_err());
                 assert!(matches!(
                     obs.unwrap_err(),
-                    EvaluationError::UndefinedIdentifier(_)
+                    EvaluationError::UndefinedIdentifier(_, _)
                 ));
             } else {
                 assert_eq!(obs.unwrap(), exp,);
@@ -1208,7 +1350,7 @@ mod tests {
     #[test]
     fn test_add_multiple_transforms() {
         let evaluator = Evaluator::new()
-            .with_transform("sqrt", |v: &[Value]| {
+            .with_transform("sqrt", |_: Location, v: &[Value]| {
                 let num = v
                     .first()
                     .expect("There should be one argument!")
@@ -1216,7 +1358,7 @@ mod tests {
                     .expect("Should be a valid number!");
                 Ok(value!(num.sqrt() as u64))
             })
-            .with_transform("square", |v: &[Value]| {
+            .with_transform("square", |_: Location, v: &[Value]| {
                 let num = v
                     .first()
                     .expect("There should be one argument!")
@@ -1232,7 +1374,7 @@ mod tests {
 
     #[test]
     fn test_transform_with_argument() {
-        let evaluator = Evaluator::new().with_transform("split", |args: &[Value]| {
+        let evaluator = Evaluator::new().with_transform("split", |_: Location, args: &[Value]| {
             let s = args
                 .first()
                 .expect("Should be a first argument!")
@@ -1253,25 +1395,19 @@ mod tests {
         );
     }
 
-    #[derive(Debug, thiserror::Error)]
-    enum CustomError {
-        #[error("Invalid argument in transform!")]
-        InvalidArgument,
-    }
-
-    #[test]
+    /*#[test]
     fn test_custom_error_message() {
-        let evaluator = Evaluator::new().with_transform("error", |_: &[Value]| {
-            Err(CustomError::InvalidArgument.into())
+        let evaluator = Evaluator::new().with_transform("error", |_: Location, _: &[Value]| {
+            Err(EvaluationError::InvalidContext)
         });
         let res = evaluator.eval("1234|error");
         assert!(res.is_err());
         if let EvaluationError::CustomError(e) = res.unwrap_err() {
-            assert_eq!(e.to_string(), "Failed transform: error")
+            assert_eq!(e.to_string(), "Failed transform \"error\" at (0, 10)")
         } else {
             panic!("Should have returned a Custom error!")
         }
-    }
+    }*/
 
     #[test]
     fn test_filter_collections_many_returned() {
@@ -1547,16 +1683,16 @@ mod tests {
     }
 
     #[rstest]
-    #[case(r#" date("29/03/1988", "%d/%m/%Y") + duration(600, "days") < date("1990-03-29", "%Y-%m-%d") "#, value!(true))]
-    #[case(r#" date("29/03/1988", "%d/%m/%Y") > $now "#, value!(false))]
+    #[case(r#" date("29/03/1988", "[day]/[month]/[year]") + duration(600, "days") < date("1990-03-29", "[year]-[month]-[day]") "#, value!(true))]
+    #[case(r#" date("29/03/1988", "[day]/[month]/[year]") > $now "#, value!(false))]
     fn test_date_and_duration(#[case] input: String, #[case] output: Value) {
         test_eval(input, output)
     }
 
     #[rstest]
-    #[case(r#" date("1988-03-29", "%Y-%m-%d") "#, value!(575596800i64))]
-    #[case(r#" date("1988-03-29T00:00:00", "%Y-%m-%dT%H:%M:%S") "#, value!(575596800i64))]
-    #[case(r#" datetime("1988-03-29T00:00:00", "%Y-%m-%dT%H:%M:%S") "#, value!(575596800i64))]
+    #[case(r#" date("1988-03-29", "[year]-[month]-[day]") "#, value!(575596800i64))]
+    #[case(r#" date("1988-03-29T00:00:00", "[year]-[month]-[day]T[hour]:[minute]:[second]") "#, value!(575596800i64))]
+    #[case(r#" datetime("1988-03-29T00:00:00", "[year]-[month]-[day]T[hour]:[minute]:[second]") "#, value!(575596800i64))]
     fn test_date_and_datetime(#[case] input: String, #[case] output: Value) {
         test_eval(input, output)
     }

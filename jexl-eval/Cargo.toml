@@ -2,22 +2,25 @@
 edition = '2018'
 name = "jexl-eval"
 version = "0.1.7"
-authors = ["Mike Cooper <mythmon@gmail.com>", "The Sync Team <sync-team@mozilla.com>", "The Glean Team <glean-team@mozilla.com>"]
+authors = [
+    "Mike Cooper <mythmon@gmail.com>",
+    "The Sync Team <sync-team@mozilla.com>",
+    "The Glean Team <glean-team@mozilla.com>",
+]
 description = "A JEXL evaluator written in Rust"
 license = "MPL-2.0"
 repository = "https://github.com/mozilla/jexl-rs"
 
 [dependencies]
-jexl-parser = { version = "^0.1.7-alpha.0", path = "../jexl-parser" }
-serde.workspace = true
-serde_json.workspace = true
-thiserror = "1.0.37"
-anyhow = "1.0.66"
-chrono = "0.4.23"
-regex = "1.7.0"
 dashmap = "5.4.0"
 fxhash = "0.2.1"
+jexl-parser = { version = "^0.1.7-alpha.0", path = "../jexl-parser" }
+regex.workspace = true
 rustc-hash = "1.1.0"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time = { workspace = true, features = ["local-offset", "parsing"] }
 
 [dev-dependencies]
 rstest = "0.16.0"
