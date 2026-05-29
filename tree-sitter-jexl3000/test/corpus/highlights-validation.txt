@@ -1,0 +1,309 @@
+============================================
+Keywords and Special Keywords
+============================================
+
+this
+true
+false
+null
+$now
+$now_utc
+acc
+
+---
+
+(program
+  (expression_statement (this))
+  (expression_statement (true))
+  (expression_statement (false))
+  (expression_statement (null))
+  (expression_statement (now))
+  (expression_statement (now_utc))
+  (expression_statement (acc)))
+
+============================================
+Comments
+============================================
+
+# This is a comment
+x
+
+---
+
+(program
+  (comment)
+  (expression_statement (identifier)))
+
+============================================
+String and Number Literals
+============================================
+
+"hello"
+'world'
+42
+3.14
+1e10
+
+---
+
+(program
+  (expression_statement (string (string_fragment)))
+  (expression_statement (string (string_fragment)))
+  (expression_statement (number))
+  (expression_statement (number))
+  (expression_statement (number)))
+
+============================================
+Transform Operations (Pipe)
+============================================
+
+value | uppercase
+
+---
+
+(program
+  (expression_statement
+    (transform
+      (identifier)
+      (identifier))))
+
+============================================
+Member Expressions - Property Access
+============================================
+
+obj.property
+obj?.property
+deep.nested.property
+
+---
+
+(program
+  (expression_statement (member_expression (identifier) (property_identifier)))
+  (expression_statement (member_expression (identifier) (property_identifier)))
+  (expression_statement
+    (member_expression
+      (member_expression (identifier) (property_identifier))
+      (property_identifier))))
+
+============================================
+Regular Identifiers - Variables
+============================================
+
+myVar
+camelCaseVar
+snake_case_var
+_private
+$special
+
+---
+
+(program
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement (identifier))
+  (expression_statement (identifier)))
+
+============================================
+Binary Operators - Arithmetic
+============================================
+
+a + b
+a - b
+a * b
+a / b
+a % b
+a // b
+a ^ b
+
+---
+
+(program
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier))))
+
+============================================
+Binary Operators - Logical
+============================================
+
+a && b
+a || b
+a in b
+
+---
+
+(program
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier))))
+
+============================================
+Binary Operators - Relational
+============================================
+
+a < b
+a <= b
+a > b
+a >= b
+a == b
+a != b
+
+---
+
+(program
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier))))
+
+============================================
+Binary Operators - Special
+============================================
+
+a ?? b
+a ~ b
+a @ b
+a @+ b
+
+---
+
+(program
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier)))
+  (expression_statement (binary_expression (identifier) (identifier))))
+
+============================================
+Unary Not Operator
+============================================
+
+!x
+
+---
+
+(program
+  (expression_statement (unary_expression (identifier))))
+
+============================================
+Operator Precedence and Categorization
+============================================
+
+a + b * c
+a && b || c
+a.b + c.d
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      (identifier)
+      (binary_expression (identifier) (identifier))))
+  (expression_statement
+    (binary_expression
+      (binary_expression (identifier) (identifier))
+      (identifier)))
+  (expression_statement
+    (binary_expression
+      (member_expression (identifier) (property_identifier))
+      (member_expression (identifier) (property_identifier)))))
+
+============================================
+Object and Array Literals
+============================================
+
+{}
+[]
+{a: 1}
+[1, 2, 3]
+{x: value, y: 2}
+
+---
+
+(program
+  (expression_statement (object))
+  (expression_statement (array))
+  (expression_statement (object (pair (property_identifier) (number))))
+  (expression_statement (array (number) (number) (number)))
+  (expression_statement
+    (object
+      (pair (property_identifier) (identifier))
+      (pair (property_identifier) (number)))))
+
+============================================
+Ternary Expressions
+============================================
+
+condition ? case1 : case2
+a > 0 ? positive : negative
+
+---
+
+(program
+  (expression_statement
+    (ternary_expression
+      (identifier)
+      (identifier)
+      (identifier)))
+  (expression_statement
+    (ternary_expression
+      (binary_expression (identifier) (number))
+      (identifier)
+      (identifier))))
+
+============================================
+Chained Property Access
+============================================
+
+user.profile.name
+a.b.c.d
+
+---
+
+(program
+  (expression_statement
+    (member_expression
+      (member_expression
+        (identifier)
+        (property_identifier))
+      (property_identifier)))
+  (expression_statement
+    (member_expression
+      (member_expression
+        (member_expression
+          (identifier)
+          (property_identifier))
+        (property_identifier))
+      (property_identifier))))
+
+============================================
+Mixed Expression with Transform
+============================================
+
+items | sort
+
+---
+
+(program
+  (expression_statement
+    (transform
+      (identifier)
+      (identifier))))
+
+============================================
+Logical AND Expression
+============================================
+
+a && b
+
+---
+
+(program
+  (expression_statement (binary_expression (identifier) (identifier))))

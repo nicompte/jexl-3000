@@ -1,0 +1,40 @@
+{
+  "name": "jexl-3000-monaco",
+  "version": "0.1.0",
+  "description": "Monaco Editor integration for jexl-3000: syntax highlighting, hover, completion, and evaluation",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "assets"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build && tsc --emitDeclarationOnly --declaration --declarationMap --declarationDir dist --noEmit false --outDir dist --project tsconfig.build.json",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "copy-assets": "node scripts/copy-assets.js",
+    "postinstall": "node scripts/copy-assets.js 2>/dev/null || true"
+  },
+  "peerDependencies": {
+    "monaco-editor": ">=0.44.0"
+  },
+  "dependencies": {
+    "web-tree-sitter": "^0.26.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "monaco-editor": "^0.55.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.3",
+    "vite": "npm:rolldown-vite@latest",
+    "vite-plugin-wasm-pack": "^0.1.12"
+  }
+}

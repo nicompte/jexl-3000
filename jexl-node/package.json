@@ -4,24 +4,18 @@
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
-    "name": "jexl-node",
-    "triples": {
-      "defaults": false,
-      "additional": [
-        "aarch64-unknown-linux-gnu",
-        "x86_64-apple-darwin",
-        "x86_64-unknown-linux-gnu",
-        "aarch64-apple-darwin"
-      ]
-    }
+    "binaryName": "jexl-node",
+    "targets": [
+      "aarch64-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin"
+    ]
   },
   "license": "MIT",
   "devDependencies": {
-    "@napi-rs/cli": "^2.6.2",
-    "ava": "^4.0.1"
-  },
-  "engines": {
-    "node": ">= 10"
+    "@napi-rs/cli": "^3.5.1",
+    "ava": "^6.4.1"
   },
   "scripts": {
     "artifacts": "napi artifacts",

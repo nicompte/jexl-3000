@@ -1,5 +1,5 @@
 [package]
-edition = '2018'
+edition = '2024'
 name = "jexl-parser"
 version = "0.1.7"
 authors = ["Mike Cooper <mythmon@gmail.com>", "The Sync Team <sync-team@mozilla.com>", "The Glean Team <glean-team@mozilla.com>"]
@@ -8,5 +8,5 @@ license = "MPL-2.0"
 repository = "https://github.com/mozilla/jexl-rs"
 
 [dependencies]
-lalrpop-util = { version = "0.19.8", features = ["lexer"] }
-regex = "1.7.1"
+lalrpop-util.workspace = true
+regex-lite.workspace = true

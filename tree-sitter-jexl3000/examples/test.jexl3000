@@ -1,8 +1,8 @@
 {
   id: person_id @ /([\\w\\-]+)-\\d+/,
   age: age,
-  nb_homes: homes | len(),
-  nb_cars: cars | len,
-  nb_old_contracts: contracts | filter( this.effective_date | isOlderThan(10, "years", "%Y-%m-%dT%H:%M:%S") ) | len,
+  nb_homes: homes | size,
+  nb_cars: cars | size,
+  nb_old_contracts: contracts | filter( this.effective_date | toDateTime | age > 10 ) | size,
   total_amount: contracts | pick("amount") | sum
 }

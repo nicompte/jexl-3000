@@ -5,6 +5,9 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use napi::bindgen_prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::value::Value;
+use std::sync::LazyLock;
+
+static EMPTY_CONTEXT: LazyLock<Value> = LazyLock::new(|| serde_json::json!({}));
 
 #[macro_use]
 extern crate napi_derive;
@@ -21,10 +24,10 @@ impl Evaluator {
 
   #[napi]
   pub fn evaluate(&self, expression: String, context: Option<Value>) -> Result<Value> {
-    let context = context.unwrap_or_else(|| serde_json::json!({}));
+    let context = context.as_ref().unwrap_or(&EMPTY_CONTEXT);
     self
       .0
-      .eval_in_context(&expression, &context)
+      .eval_in_context(&expression, context)
       .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
   }
 
@@ -35,14 +38,14 @@ impl Evaluator {
     expressions: Vec<String>,
     context: Option<Value>,
   ) -> Vec<Result<Value>> {
-    let context = context.unwrap_or_else(|| serde_json::json!({}));
+    let context = context.as_ref().unwrap_or(&EMPTY_CONTEXT);
     expressions
       .par_iter()
       .map(|expression| {
         self
           .0
-          .eval_in_context(expression, &context)
-          .map_err(|e| Error::new(Status::InvalidArg, e.to_string()))
+          .eval_in_context(expression, context)
+          .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
       })
       .collect::<Vec<_>>()
   }

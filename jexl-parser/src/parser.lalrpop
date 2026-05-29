@@ -1,121 +1,405 @@
 use std::str::FromStr;
+use crate::ast::{Expression, Expr, OpCode, UnCode, ExpressionTransform, contains_filter_property};
+use crate::lexer::Token;
 
-use crate::ast::{Expression, Expr, OpCode, UnCode, ExpressionTransform};
+grammar<'input>();
 
-grammar;
+extern {
+    type Location = usize;
+    type Error = crate::lexer::LexError;
 
-match {
-    r"\s*" => { }, // The default whitespace skipping is disabled an `ignore pattern` is specified
-    r"#[^\n\r]*[\n\r]*" => { }, // Skip `# comments`
-    _
+    enum Token<'input> {
+        // Literals
+        Number => Token::Number(<f64>),
+        DoubleQuotedString => Token::DoubleQuotedString(<&'input str>),
+        SingleQuotedString => Token::SingleQuotedString(<&'input str>),
+        Regex => Token::Regex(<&'input str>, <&'input str>),
+        TrueToken => Token::Boolean(true),
+        FalseToken => Token::Boolean(false),
+        Null => Token::Null,
+        Identifier => Token::Identifier(<&'input str>),
+
+        // Keywords
+        "if" => Token::If,
+        "else" => Token::Else,
+        "in" => Token::In,
+        "$now" => Token::DollarNow,
+        "$now_utc" => Token::DollarNowUtc,
+
+        // Operators
+        "+" => Token::Plus,
+        "-" => Token::Minus,
+        "*" => Token::Multiply,
+        "/" => Token::Divide,
+        "//" => Token::FloorDivide,
+        "%" => Token::Modulus,
+        "^" => Token::Exponent,
+        "!" => Token::Not,
+        "~" => Token::Matches,
+        "@" => Token::Capture,
+        "@+" => Token::CaptureMultiple,
+
+        // Comparison
+        "==" => Token::Equal,
+        "!=" => Token::NotEqual,
+        ">" => Token::Greater,
+        "<" => Token::Less,
+        ">=" => Token::GreaterEqual,
+        "<=" => Token::LessEqual,
+
+        // Logical
+        "&&" => Token::And,
+        "||" => Token::Or,
+
+        // Delimiters
+        "(" => Token::LeftParen,
+        ")" => Token::RightParen,
+        "[" => Token::LeftBracket,
+        "]" => Token::RightBracket,
+        "{" => Token::LeftBrace,
+        "}" => Token::RightBrace,
+        "," => Token::Comma,
+        ":" => Token::Colon,
+        "." => Token::Dot,
+        "|" => Token::Pipe,
+        "?" => Token::Question,
+    }
 }
 
-pub Expression: Box<Expression> = Expr00;
-
-Expr00: Box<Expression> = {
-    <l:@L> <left: Expression> <operation: Op10> <right: Expr10> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
-    Expr10,
+pub Expression: Box<Expression> = {
+    ExprConditional
 };
 
-Expr10: Box<Expression> = {
-    <l:@L> <left: Expr10> <operation: Op20> <right: Expr20> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
-    Expr20,
+/* ---------------- LOWEST PRECEDENCE ---------------- */
+
+ExprConditional: Box<Expression> = {
+    <l:@L> <cond: ExprOr> "?" <truthy: ExprConditional> ":" <falsy: ExprConditional> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::Conditional { left: cond, truthy, falsy },
+            location: (l, r)
+        }),
+    ExprIfElse
 };
 
-Expr20: Box<Expression> = {
-    <l:@L> <left: Expr20> <operation: Op30> <right: Expr30> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
-    Expr30,
+ExprIfElse: Box<Expression> = {
+    <l:@L> "if" <cond: ExprIfElse> "{" <truthy: ExprConditional> "}" "else" "{" <falsy: ExprConditional> "}" <r:@R>
+        => Box::new(Expression {
+            expression: Expr::Conditional { left: cond, truthy, falsy },
+            location: (l, r)
+        }),
+    ExprOr
 };
 
-Expr30: Box<Expression> = {
-    <l:@L> <left: Expr30> <operation: Op40> <right: Expr40> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
-    Expr40,
+/* ---------------- LOGICAL ---------------- */
+
+ExprOr: Box<Expression> = {
+    <l:@L> <left: ExprOr> "||" <right: ExprAnd> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::BinaryOperation { left, right, operation: OpCode::Or },
+            location: (l, r)
+        }),
+    ExprAnd
 };
 
-Expr40: Box<Expression> = {
-    <l:@L> <left: Expr40> <operation: Op50> <right: Expr50> <r:@R> => Box::new(Expression { expression: Expr::BinaryOperation { left, right, operation }, location: (l, r) }),
-    Expr41,
+ExprAnd: Box<Expression> = {
+    <l:@L> <left: ExprAnd> "&&" <right: ExprComparison> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::BinaryOperation { left, right, operation: OpCode::And },
+            location: (l, r)
+        }),
+    ExprComparison
 };
 
-Expr41: Box<Expression> = {
-    <l:@L> <operation: Un10> <right: Expr50> <r:@R> => Box::new(Expression { expression: Expr::UnaryOperation { right, operation }, location: (l, r) }),
-    Expr50,
+/* ---------------- COMPARISON ---------------- */
+
+ExprComparison: Box<Expression> = {
+    <l:@L> <left: ExprComparison> <op: Op20> <right: ExprAddSub> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::BinaryOperation { left, right, operation: op },
+            location: (l, r)
+        }),
+    ExprAddSub
 };
 
-Expr50: Box<Expression> = {
-    <l:@L> <left: Expr50> "?" <truthy: Expr60> ":" <falsy: Expr60> <r:@R> => Box::new(Expression { expression: Expr::Conditional {left, truthy, falsy}, location: (l, r) }),
-    Expr51,
+/* ---------------- ADD / SUB ---------------- */
+
+ExprAddSub: Box<Expression> = {
+    <l:@L> <left: ExprAddSub> <op: Op30> <right: ExprMulDiv> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::BinaryOperation { left, right, operation: op },
+            location: (l, r)
+        }),
+    ExprMulDiv
 };
 
-Expr51: Box<Expression> = {
-    <l:@L> "if" <left: Expr51> "{" <truthy: Expr60> "}" "else" "{" <falsy: Expr60> "}" <r:@R> => Box::new(Expression { expression: Expr::Conditional {left, truthy, falsy}, location: (l, r) }),
-    Expr60,
+/* ---------------- EXPONENT ---------------- */
+
+ExprExponent: Box<Expression> = {
+    <l:@L> <left: ExprUnary> "^" <right: ExprExponent> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::BinaryOperation {
+                left,
+                right,
+                operation: OpCode::Exponent,
+            },
+            location: (l, r)
+        }),
+    ExprUnary
 };
 
-Expr60: Box<Expression> = {
-    <l:@L> <subject: Expr60> "|" <name: Identifier> <args: Args?> <r:@R> => Box::new(Expression { expression: Expr::Transform{name, subject, args}, location: (l, r) }),
-    Expr70
+/* ---------------- MULTIPLICATIVE ---------------- */
+
+ExprMulDiv: Box<Expression> = {
+    <l:@L> <left: ExprMulDiv> <op: Op40> <right: ExprUnary> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::BinaryOperation { left, right, operation: op },
+            location: (l, r)
+        }),
+    ExprExponent
 };
 
-Expr70: Box<Expression> = {
-    <l:@L> <subject: Expr60>  "|" "mapTransform(" <name: Identifier> <args: Args?> ")" <r:@R> => Box::new(Expression { expression: Expr::MapTransform {name, subject, args }, location: (l, r) }),
-    Expr80
-}
+/* ---------------- UNARY ---------------- */
 
-Expr80: Box<Expression> = {
-    <l:@L> <subject: Expr60> "|" "filterTransform(" <name: Identifier> <args: Args?> ")" <r:@R> => Box::new(Expression { expression: Expr::FilterTransform {name, subject, args }, location: (l, r) }),
-    Expr81
-}
-
-Expr81: Box<Expression> = {
-    <l:@L> <subject: Expr60>  "|" <name: ET> "(" <expression: Expression> ","? <args: Number?> ")" <r:@R> => Box::new(Expression { expression: Expr::ExpressionTransform {name, subject, expression, args }, location: (l, r) }),
-    Expr82
-}
-
-Expr82: Box<Expression> = {
-    <l:@L> <subject: Expr60> "|" "reduce(" <init: Expression> "," <expression: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::ReduceExpression { subject, init, expression }, location: (l, r) }),
-    Expr85
-}
-
-Expr85: Box<Expression> = {
-    <l:@L> "date(" <date: Expr85> "," <format: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::Date { date, format }, location: (l, r) }),
-    Expr86
-}
-
-Expr86: Box<Expression> = {
-    <l:@L> "datetime(" <datetime: Expr80> "," <format: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::DateTime { datetime, format }, location: (l, r) }),
-    Expr87
-}
-
-Expr87: Box<Expression> = {
-    <l:@L> "duration(" <duration: Expr80> "," <duration_type: Expression> ")" <r:@R> => Box::new(Expression { expression: Expr::Duration { duration, duration_type }, location: (l, r) }),
-    Expr88
-}
-
-Expr88: Box<Expression> = {
-    <l:@L> "$now" <r:@R> => Box::new(Expression { expression: Expr::Now, location: (l, r) }),
-    Expr90
-}
-
-Expr90: Box<Expression> = {
-    <l:@L> <subject: Expr70> <index: Index> <r:@R> => Box::new(Expression { expression: Expr::IndexOperation{subject, index}, location: (l, r) }),
-    <l:@L> <subject: Expr70> "." <ident: Identifier> <r:@R> => Box::new(Expression { expression: Expr::DotOperation{subject, ident}, location: (l, r) }),
-    Expr100
+ExprUnary: Box<Expression> = {
+    <l:@L> <op: Un10> <expr: ExprUnary> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::UnaryOperation { right: expr, operation: op },
+            location: (l, r)
+        }),
+    ExprPipe
 };
 
-Expr100: Box<Expression> = {
-    <l:@L> <e:Number> <r:@R> => Box::new(Expression { expression: Expr::Number(e), location: (l, r) }),
-    <l:@L> <e:Boolean> <r:@R> => Box::new(Expression { expression: Expr::Boolean(e), location: (l, r) }),
-    <l:@L> <e:String> <r:@R> => Box::new(Expression { expression: Expr::String(e), location: (l, r) }),
-    <l:@L> <e:Array> <r:@R> => Box::new(Expression { expression: Expr::Array(e), location: (l, r) }),
-    <l:@L> <e:Object> <r:@R> => Box::new(Expression { expression: Expr::Object(e), location: (l, r) }),
-    <l:@L> <e:Identifier> <r:@R> => Box::new(Expression { expression: Expr::Identifier(e), location: (l, r) }),
-    <l:@L> <e:Regex> <r:@R> => Box::new(Expression { expression: Expr::Regex(e), location: (l, r) }),
-    "(" <Expression> ")",
+PipeArgs: Vec<Box<Expression>> = {
+    <Comma<Expression>> => <>
 };
 
-Args: Vec<Box<Expression>> = {
-    "(" <Comma<Expression>> ")"
+/* ---------------- PIPES / TRANSFORMS ---------------- */
+
+ExprPipe: Box<Expression> = {
+    <l:@L> <subject: ExprPipe> "|" <name: Ident> <r:@R> => {
+        Box::new(Expression {
+            expression: Expr::Transform { name, subject, args: None },
+            location: (l, r)
+        })
+    },
+
+    <l:@L> <subject: ExprPipe> "|" <name: Ident> "(" <content: PipeArgs> ")" <r:@R> =>? {
+         let name_str = name.as_str();
+
+        match name_str {
+            "reduce" => {
+                // reduce(init, expression) - expects exactly 2 args
+                if content.len() == 2 {
+                    Ok(Box::new(Expression {
+                        expression: Expr::ReduceExpression {
+                            subject,
+                            init: content[0].clone(),
+                            expression: content[1].clone()
+                        },
+                        location: (l, r)
+                    }))
+                } else {
+                    Err(lalrpop_util::ParseError::User {
+                        error: crate::lexer::LexError { message: "Parse error".to_string(), line: 0, column: l }
+                    })
+                }
+            },
+            "map" | "filter" | "sortBy" | "any" | "all" | "find" | "findIndex" | "apply" => {
+                // If the first argument is a bare identifier,
+                // treat it as the shorthand for the corresponding *Transform variant
+                // (e.g. `map(lowercase)` => `mapTransform(lowercase)`).
+                if let Some(first) = content.first() {
+                    if name_str == "map" {
+                        if let Expr::Identifier(inner_name) = &first.expression {
+                            let args = if content.len() > 1 { Some(content[1..].to_vec()) } else { None };
+                            return Ok(Box::new(Expression {
+                                expression: Expr::MapTransform { name: inner_name.clone(), subject, args },
+                                location: (l, r)
+                            }));
+                        }
+                    } else if name_str == "filter" {
+                        if let Expr::Identifier(inner_name) = &first.expression {
+                            let args = if content.len() > 1 { Some(content[1..].to_vec()) } else { None };
+                            return Ok(Box::new(Expression {
+                                expression: Expr::FilterTransform { name: inner_name.clone(), subject, args },
+                                location: (l, r)
+                            }));
+                        }
+                    } else if name_str == "sortBy" {
+                        if let Expr::Identifier(inner_name) = &first.expression {
+                            let args = if content.len() > 1 { Some(content[1..].to_vec()) } else { None };
+                            return Ok(Box::new(Expression {
+                                expression: Expr::SortByTransform { name: inner_name.clone(), subject, args },
+                                location: (l, r)
+                            }));
+                        }
+                    } else if name_str == "any" {
+                        if let Expr::Identifier(inner_name) = &first.expression {
+                            let args = if content.len() > 1 { Some(content[1..].to_vec()) } else { None };
+                            return Ok(Box::new(Expression {
+                                expression: Expr::AnyTransform { name: inner_name.clone(), subject, args },
+                                location: (l, r)
+                            }));
+                        }
+                    } else if name_str == "all" {
+                        if let Expr::Identifier(inner_name) = &first.expression {
+                            let args = if content.len() > 1 { Some(content[1..].to_vec()) } else { None };
+                            return Ok(Box::new(Expression {
+                                expression: Expr::AllTransform { name: inner_name.clone(), subject, args },
+                                location: (l, r)
+                            }));
+                        }
+                    } else if name_str == "find" {
+                        if let Expr::Identifier(inner_name) = &first.expression {
+                            let args = if content.len() > 1 { Some(content[1..].to_vec()) } else { None };
+                            return Ok(Box::new(Expression {
+                                expression: Expr::FindTransform { name: inner_name.clone(), subject, args },
+                                location: (l, r)
+                            }));
+                        }
+                    } else if name_str == "findIndex" {
+                        if let Expr::Identifier(inner_name) = &first.expression {
+                            let args = if content.len() > 1 { Some(content[1..].to_vec()) } else { None };
+                            return Ok(Box::new(Expression {
+                                expression: Expr::FindIndexTransform { name: inner_name.clone(), subject, args },
+                                location: (l, r)
+                            }));
+                        }
+                    }
+                }
+
+                // Expression transforms: expect 1 expression, optionally followed by a number
+                let et = match name_str {
+                    "map" => ExpressionTransform::Map,
+                    "filter" => ExpressionTransform::Filter,
+                    "sortBy" => ExpressionTransform::SortBy,
+                    "any" => ExpressionTransform::Any,
+                    "all" => ExpressionTransform::All,
+                    "find" => ExpressionTransform::Find,
+                    "findIndex" => ExpressionTransform::FindIndex,
+                    "apply" => ExpressionTransform::Apply,
+                    _ => unreachable!(),
+                };
+
+                if content.is_empty() {
+                    return Err(lalrpop_util::ParseError::User {
+                        error: crate::lexer::LexError { message: "Parse error".to_string(), line: 0, column: l }
+                    });
+                }
+
+                let expression = content[0].clone();
+                let args = if content.len() > 1 {
+                    match content[1].expression {
+                        Expr::Number(n) => Some(n),
+                        Expr::UnaryOperation { operation: crate::ast::UnCode::Minus, ref right } => {
+                            if let Expr::Number(n) = right.expression {
+                                Some(-n)
+                            } else {
+                                return Err(lalrpop_util::ParseError::User {
+                                    error: crate::lexer::LexError { message: "Parse error".to_string(), line: 0, column: l }
+                                });
+                            }
+                        },
+                        _ => {
+                            return Err(lalrpop_util::ParseError::User {
+                                error: crate::lexer::LexError { message: "Parse error".to_string(), line: 0, column: l }
+                            });
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                Ok(Box::new(Expression {
+                    expression: Expr::ExpressionTransform {
+                        name: et,
+                        subject,
+                        expression,
+                        args
+                    },
+                    location: (l, r)
+                }))
+            },
+            _ => {
+                // Regular transform with args
+                Ok(Box::new(Expression {
+                    expression: Expr::Transform {
+                        name,
+                        subject,
+                        args: Some(content)
+                    },
+                    location: (l, r)
+                }))
+            }
+        }
+    },
+
+    ExprNow
+};
+
+/* ---------------- POSTFIX ---------------- */
+
+ExprNow: Box<Expression> = {
+    <l:@L> "$now" <r:@R>
+        => Box::new(Expression { expression: Expr::Now, location: (l, r) }),
+    <l:@L> "$now_utc" <r:@R>
+        => Box::new(Expression { expression: Expr::NowUtc, location: (l, r) }),
+    ExprPostfix
+};
+
+ExprPostfix: Box<Expression> = {
+    <l:@L> <subject: ExprPostfix> <index: Index> <r:@R>
+        => {
+            let is_filter = contains_filter_property(&index);
+            Box::new(Expression {
+                expression: Expr::IndexOperation { subject, index, is_filter },
+                location: (l, r)
+            })
+        },
+
+    <l:@L> <subject: ExprPostfix> "." <ident: Ident> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::DotOperation { subject, ident },
+            location: (l, r)
+        }),
+
+    ExprAtom
+};
+
+/* ---------------- ATOMS ---------------- */
+
+ExprAtom: Box<Expression> = {
+    <l:@L> "." <ident: Ident> <r:@R>
+        => Box::new(Expression {
+            expression: Expr::FilterItemProperty(ident),
+            location: (l, r)
+        }),
+
+    <l:@L> <e:Num> <r:@R>
+        => Box::new(Expression { expression: Expr::Number(e), location: (l, r) }),
+
+    <l:@L> <e:Bool> <r:@R>
+        => Box::new(Expression { expression: Expr::Boolean(e), location: (l, r) }),
+
+    <l:@L> <e:Str> <r:@R>
+        => Box::new(Expression { expression: Expr::String(e), location: (l, r) }),
+
+    <l:@L> <e:Array> <r:@R>
+        => Box::new(Expression { expression: Expr::Array(e), location: (l, r) }),
+
+    <l:@L> <e:Object> <r:@R>
+        => Box::new(Expression { expression: Expr::Object(e), location: (l, r) }),
+
+    <l:@L> <e:Ident> <r:@R>
+        => Box::new(Expression { expression: Expr::Identifier(e), location: (l, r) }),
+
+    <l:@L> <e:Rgx> <r:@R>
+        => Box::new(Expression { expression: Expr::Regex(e.0, e.1), location: (l, r) }),
+
+    <l:@L> Null <r:@R>
+        => Box::new(Expression { expression: Expr::Null, location: (l, r) }),
+
+    "(" <Expression> ")"
 };
 
 Un10: UnCode = {
@@ -151,6 +435,7 @@ Op40: OpCode = {
     "*" => OpCode::Multiply,
     "//" => OpCode::FloorDivide,
     "/" => OpCode::Divide,
+    "%" => OpCode::Modulus,
 };
 
 Op50: OpCode = {
@@ -158,44 +443,30 @@ Op50: OpCode = {
     "^" => OpCode::Exponent,
 };
 
-ET: ExpressionTransform = {
-    "map" => ExpressionTransform::Map,
-    "filter" => ExpressionTransform::Filter,
-    "sortBy" => ExpressionTransform::SortBy,
-    "any" => ExpressionTransform::Any,
-    "all" => ExpressionTransform::All,
-    "find" => ExpressionTransform::Find,
-    "findIndex" => ExpressionTransform::FindIndex,
-    "apply" => ExpressionTransform::Apply,
+Num: f64 = {
+    <n:Number> => n,
 };
 
-Number: f64 = {
-    r"-?[0-9]+" => f64::from_str(<>).unwrap(),
-    r"-?[0-9]+\.[0-9]*" => f64::from_str(<>).unwrap(),
-    r"-?\.[0-9]+" => f64::from_str(<>).unwrap(),
+Str: String = {
+    <s:DoubleQuotedString> => if s.contains("\\\"") { s.replace("\\\"", "\"") } else { s.to_string() },
+    <s:SingleQuotedString> => if s.contains("\\'") { s.replace("\\'", "'") } else { s.to_string() },
 };
 
-String: String = {
-    <s: r#""([^"\\]*(\\")?)*""#> => s[1..s.len() - 1].to_string().replace("\\\"", "\""),
-    <s: r#"'([^'\\]*(\\')?)*'"#> => s[1..s.len() - 1].to_string().replace("\\'", "'"),
-};
-
-Regex: String = {
-    <s: r#"/([^']*(\\')?)*/"#> => s[1..s.len() - 1].to_string(),
+Rgx: (String, String) = {
+    <r:Regex> => (r.0.to_string(), r.1.to_string()),
 }
 
-Identifier: String = {
-    r#"[a-zA-Z_][a-zA-Z0-9_]*"# => <>.to_string()
+Ident: String = {
+    <i:Identifier> => i.to_string(),
 }
 
 Index: Box<Expression> = {
-    <l:@L> "[" "." <ident: Identifier> <op: Op20> <right: Expr80> "]" <r:@R> => Box::new(Expression { expression: Expr::Filter {ident, op, right}, location: (l, r) }),
     "[" <Expression> "]",
 }
 
-Boolean: bool = {
-    "true" => true,
-    "false" => false,
+Bool: bool = {
+    TrueToken => true,
+    FalseToken => false,
 }
 
 Comma<T>: Vec<T> = {
@@ -215,10 +486,9 @@ Array: Vec<Box<Expression>> = {
 
 Object: Vec<(String, Box<Expression>)> = {
     "{" <Comma<(<ObjectIdentifier> ":" <Expression>)>> "}",
-    "{}" => vec![],
 }
 
 ObjectIdentifier: String = {
-    String, 
-    Identifier
+    Str,
+    Ident
 }

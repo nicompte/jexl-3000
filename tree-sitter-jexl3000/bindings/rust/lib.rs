@@ -13,26 +13,20 @@
 //! use tree_sitter::Parser;
 //!
 //! let code = r#"
-//!     function double(x) {
-//!         return x * 2;
-//!     }
+//!     movies | filter(this.year > 2000) | map(this.title)
 //! "#;
 //! let mut parser = Parser::new();
-//! parser.set_language(tree_sitter_jexl3000::language()).expect("Error loading jexl3000 grammar");
+//! parser.set_language(&tree_sitter_jexl3000::language()).expect("Error loading jexl3000 grammar");
 //! let parsed = parser.parse(code, None);
-//! # let parsed = parsed.unwrap();
-//! # let root = parsed.root_node();
-//! # assert!(!root.has_error());
+//! let parsed = parsed.unwrap();
+//! let root = parsed.root_node();
+//! assert!(!root.has_error());
 //! ```
 //!
-//! [Language]: https://docs.rs/tree-sitter/*/tree_sitter/struct.Language.html
-//! [language func]: fn.language.html
-//! [Parser]: https://docs.rs/tree-sitter/*/tree_sitter/struct.Parser.html
-//! [tree-sitter]: https://tree-sitter.github.io/
 
 use tree_sitter::Language;
 
-extern "C" {
+unsafe extern "C" {
     fn tree_sitter_jexl3000() -> Language;
 }
 
@@ -44,24 +38,18 @@ pub fn language() -> Language {
 }
 
 /// The source of the jexl3000 tree-sitter grammar description.
-pub const GRAMMAR: &'static str = include_str!("../../grammar.js");
+pub const GRAMMAR: &str = include_str!("../../grammar.js");
 
 /// The syntax highlighting query for this language.
-pub const HIGHLIGHT_QUERY: &'static str = include_str!("../../queries/highlights.scm");
+pub const HIGHLIGHT_QUERY: &str = include_str!("../../queries/highlights.scm");
 
 /// The syntax highlighting query for languages injected into this one.
-pub const INJECTION_QUERY: &'static str = include_str!("../../queries/injections.scm");
-
-/// The local-variable syntax highlighting query for this language.
-pub const LOCALS_QUERY: &'static str = include_str!("../../queries/locals.scm");
+pub const INJECTION_QUERY: &str = include_str!("../../queries/injections.scm");
 
 /// The content of the [`node-types.json`][] file for this grammar.
 ///
 /// [`node-types.json`]: https://tree-sitter.github.io/tree-sitter/using-parsers#static-node-types
-pub const NODE_TYPES: &'static str = include_str!("../../src/node-types.json");
-
-/// The symbol tagging query for this language.
-// pub const TAGGING_QUERY: &'static str = include_str!("../../queries/tags.scm");
+pub const NODE_TYPES: &str = include_str!("../../src/node-types.json");
 
 #[cfg(test)]
 mod tests {
@@ -69,7 +57,7 @@ mod tests {
     fn can_load_grammar() {
         let mut parser = tree_sitter::Parser::new();
         parser
-            .set_language(super::language())
+            .set_language(&super::language())
             .expect("Error loading jexl3000 grammar");
     }
 }

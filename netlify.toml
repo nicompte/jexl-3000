@@ -1,0 +1,7 @@
+[build]
+  base = "demo-monaco"
+  publish = "dist"
+  command = "npm ci && npm run build"
+
+[build.environment]
+  NODE_VERSION = "24"

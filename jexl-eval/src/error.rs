@@ -41,12 +41,14 @@ pub enum EvaluationError {
     JSONError(#[from] serde_json::Error),
     #[error("Invalid filter at {0:?}")]
     InvalidFilter(Location),
+    #[error("Filter item property used outside filter context at {0:?}")]
+    FilterItemPropertyOutsideFilter(Location),
+    #[error("Expected array for filter operation at {0:?}")]
+    ExpectedArray(Location),
     #[error("Invalid range at {0:?}")]
     InvalidRange(Location),
     #[error("Filter should return a bool at {0:?}")]
     FilterShouldReturnBool(Location),
-    #[error("Invalid duration \"{1}\" at {0:?}")]
-    InvalidDuration(Location, String),
     #[error("Failed transform \"{1}\" at {0:?}")]
     FailedTransform(Location, String),
     #[error("Failed to evaluate expression \"{1}\" at {0:?}")]
@@ -87,6 +89,9 @@ pub enum EvaluationError {
 
     #[error("Failed reduce operation at {0:?}")]
     FailedReduce(Location),
+
+    #[error("Failed to parse expression")]
+    ParseError,
 }
 
 /*impl<'a> From<ParseError<usize, Token<'a>, &'a str>> for EvaluationError<'a> {

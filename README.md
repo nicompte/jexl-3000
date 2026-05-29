@@ -1,6 +1,7 @@
 # jexl-3000
 
 jexl-3000 is a fork from [github.com/mozilla/jexl-rs](github.com/mozilla/jexl-rs) that adds:
+
 - a set of transforms
 - parsing cache
 - map/reduce/filter and similar transforms, that take an expression as input
@@ -33,7 +34,7 @@ fn main() {
             {"name": "Peter": "age": 19}
         ]
     });
-    let res = evaluator.eval_in_context("{meanAge: users | pick('age') | mean | toInt, youngest: users | sortByAttribute('age') | first}", &context);
+    let res = evaluator.eval_in_context("{meanAge: users | pick('age') | mean | toInteger, youngest: users | sortByAttribute('age') | first}", &context);
     assert_eq!(res, json!({"meanAge": 21, "youngest": "Peter"}))
 }
 ```
@@ -49,16 +50,19 @@ npm i jexl-3000
 Import and use:
 
 ```js
-const Evaluator = require('jexl-3000').Evaluator;
+const Evaluator = require("jexl-3000").Evaluator;
 const evaluator = new Evaluator();
 const context = {
-    users: [
-        {name: 'Bob', age: 22},
-        {name: 'Alicia', age: 23},
-        {name: 'Peter', age: 19},
-    ]
+  users: [
+    { name: "Bob", age: 22 },
+    { name: "Alicia", age: 23 },
+    { name: "Peter", age: 19 },
+  ],
 };
-const res = evaluator.evaluate("{meanAge: users | pick('age') | mean | toInt, youngest: users | sortByAttribute('age') | first}", context);
+const res = evaluator.evaluate(
+  "{meanAge: users | pick('age') | mean | toInteger, youngest: users | sortByAttribute('age') | first}",
+  context,
+);
 ```
 
 ### From python
@@ -76,7 +80,7 @@ context =  {
     ]
 }
 
-evaluator.evaluate("{meanAge: users | pick('age') | mean | toInt, youngest: users | sortByAttribute('age') | first}", context)
+evaluator.evaluate("{meanAge: users | pick('age') | mean | toInteger, youngest: users | sortByAttribute('age') | first}", context)
 ```
 
 ### From wasm

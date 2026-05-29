@@ -1,0 +1,300 @@
+============================================
+Floor Division Operator
+============================================
+
+10 // 3
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      (number)
+      (number))))
+
+============================================
+$now Keyword
+============================================
+
+$now
+
+---
+
+(program
+  (expression_statement (now)))
+
+============================================
+$now_utc Keyword
+============================================
+
+$now_utc
+
+---
+
+(program
+  (expression_statement (now_utc)))
+
+============================================
+Reduce with Comma-Separated Args
+============================================
+
+arr | reduce(0, acc + this)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (number)
+      (binary_expression
+        (acc)
+        (this)))))
+
+============================================
+Map Transform
+============================================
+
+items | map(this.name)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (member_expression
+        (this)
+        (property_identifier)))))
+
+============================================
+Filter Transform
+============================================
+
+items | filter(this.active)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (member_expression
+        (this)
+        (property_identifier)))))
+
+============================================
+Apply Transform
+============================================
+
+customer | apply(this.age + 1)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (binary_expression
+        (member_expression
+          (this)
+          (property_identifier))
+        (number)))))
+
+============================================
+SortBy Transform
+============================================
+
+items | sortBy(this.name)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (member_expression
+        (this)
+        (property_identifier)))))
+
+============================================
+Find Transform
+============================================
+
+items | find(this.id == 42)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (binary_expression
+        (member_expression
+          (this)
+          (property_identifier))
+        (number)))))
+
+============================================
+FindIndex Transform
+============================================
+
+items | findIndex(this.active)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (member_expression
+        (this)
+        (property_identifier)))))
+
+============================================
+Any Transform
+============================================
+
+items | any(this > 0)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (binary_expression
+        (this)
+        (number)))))
+
+============================================
+All Transform
+============================================
+
+items | all(this > 0)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (binary_expression
+        (this)
+        (number)))))
+
+============================================
+Map then regular transform chaining
+============================================
+
+items | map(this.name) | lowercase
+
+---
+
+(program
+  (expression_statement
+    (transform
+      (map_filter_reduce
+        (identifier)
+        (mrf)
+        (member_expression
+          (this)
+          (property_identifier)))
+      (identifier))))
+
+============================================
+MRF on member expression subject
+============================================
+
+order.items | map(this.price)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (member_expression
+        (identifier)
+        (property_identifier))
+      (mrf)
+      (member_expression
+        (this)
+        (property_identifier)))))
+
+============================================
+Chained MRF operators
+============================================
+
+items | filter(this.active) | map(this.name)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (map_filter_reduce
+        (identifier)
+        (mrf)
+        (member_expression
+          (this)
+          (property_identifier)))
+      (mrf)
+      (member_expression
+        (this)
+        (property_identifier)))))
+
+============================================
+Map with inline transform in body
+============================================
+
+items | map(this.name | lowercase)
+
+---
+
+(program
+  (expression_statement
+    (map_filter_reduce
+      (identifier)
+      (mrf)
+      (transform
+        (member_expression
+          (this)
+          (property_identifier))
+        (identifier)))))
+
+============================================
+Exponent Operator
+============================================
+
+2 ^ 8
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      (number)
+      (number))))
+
+============================================
+Capture Multiple Operator
+============================================
+
+text @+ /pattern/
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      (identifier)
+      (regex (regex_pattern)))))

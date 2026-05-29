@@ -84,26 +84,58 @@ false
   (expression_statement (false)))
 
 ============================================
-Regexps
+Regexps - standalone with flags
+============================================
+
+/one/gim
+
+---
+
+(program
+  (expression_statement (regex (regex_pattern) (regex_flags))))
+
+============================================
+Regexps - standalone no flags
+============================================
+
+/on[^/]afe/gim
+
+---
+
+(program
+  (expression_statement (regex (regex_pattern) (regex_flags))))
+
+============================================
+Regexps - escaped backslash pattern
 ============================================
 
 /one\\/
-/one/g
-/one/i
-/one/gim
+
+---
+
+(program
+  (expression_statement (regex (regex_pattern))))
+
+============================================
+Regexps - escaped slash in pattern
+============================================
+
 /on\/e/gim
-/on[^/]afe/gim
+
+---
+
+(program
+  (expression_statement (regex (regex_pattern) (regex_flags))))
+
+============================================
+Regexps - character class pattern
+============================================
+
 /[\]/]/
 
 ---
 
 (program
-  (expression_statement (regex (regex_pattern)))
-  (expression_statement (regex (regex_pattern) (regex_flags)))
-  (expression_statement (regex (regex_pattern) (regex_flags)))
-  (expression_statement (regex (regex_pattern) (regex_flags)))
-  (expression_statement (regex (regex_pattern) (regex_flags)))
-  (expression_statement (regex (regex_pattern) (regex_flags)))
   (expression_statement (regex (regex_pattern))))
 
 ============================================

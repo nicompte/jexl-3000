@@ -1,0 +1,146 @@
+============================================
+Transform operator precedence test
+============================================
+
+customer.email && customer.email | lowercase
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      left: (member_expression
+        object: (identifier)
+        property: (property_identifier))
+      right: (transform
+        subject: (member_expression
+          object: (identifier)
+          property: (property_identifier))
+        transformer: (identifier)))))
+
+============================================
+Explicit-parentheses variant
+============================================
+
+customer.email && (customer.email | lowercase)
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      left: (member_expression
+        object: (identifier)
+        property: (property_identifier))
+      right: (parenthesized_expression
+        (transform
+          subject: (member_expression
+            object: (identifier)
+            property: (property_identifier))
+          transformer: (identifier))))))
+
+============================================
+Guard with deep member expression
+============================================
+
+order.customer.email && order.customer.email | lowercase
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      left: (member_expression
+        object: (member_expression
+          object: (identifier)
+          property: (property_identifier))
+        property: (property_identifier))
+      right: (transform
+        subject: (member_expression
+          object: (member_expression
+            object: (identifier)
+            property: (property_identifier))
+          property: (property_identifier))
+        transformer: (identifier)))))
+
+============================================
+Guard with additional binary on left
+============================================
+
+x > 0 && customer.email && customer.email | lowercase
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number))
+        right: (member_expression
+          object: (identifier)
+          property: (property_identifier)))
+      right: (transform
+        subject: (member_expression
+          object: (identifier)
+          property: (property_identifier))
+        transformer: (identifier)))))
+
+============================================
+No guard - standalone transform
+============================================
+
+customer.email | lowercase
+
+---
+
+(program
+  (expression_statement
+    (transform
+      subject: (member_expression
+        object: (identifier)
+        property: (property_identifier))
+      transformer: (identifier))))
+
+============================================
+Guard with OR does not protect
+============================================
+
+customer.email || customer.email | lowercase
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      left: (member_expression
+        object: (identifier)
+        property: (property_identifier))
+      right: (transform
+        subject: (member_expression
+          object: (identifier)
+          property: (property_identifier))
+        transformer: (identifier)))))
+
+============================================
+Chained transforms with guard
+============================================
+
+customer.email && customer.email | lowercase | trim
+
+---
+
+(program
+  (expression_statement
+    (binary_expression
+      left: (member_expression
+        object: (identifier)
+        property: (property_identifier))
+      right: (transform
+        subject: (transform
+          subject: (member_expression
+            object: (identifier)
+            property: (property_identifier))
+          transformer: (identifier))
+        transformer: (identifier)))))

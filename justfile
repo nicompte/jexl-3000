@@ -1,62 +1,67 @@
-alias bi := build-image
-alias rc := run-container
-alias sc := start-container
-alias stc := stop-container
-alias rmc := remove-container
-alias gen := parser
+test: test-rust test-tree-sitter test-wasm test-node
 
-test:
-  cargo nextest run
+test-rust: 
+  cargo nextest run --all-features
 
-run:
-  cargo run --bin jexl-server
+test-node:
+  cd {{justfile_directory()}}/jexl-node && \
+    npm run build && \
+    npm run test
 
-run-release:
-  cargo run --release --bin jexl-server
-
-run-release-otel:
-  cargo run --release --bin jexl-server --features otel
-
-parser:
-  cargo run --bin parser-gen
+preview: build-wasm build-tree-sitter build-jexl-3000-monaco
+  cd {{justfile_directory()}}/demo-monaco && \
+    npm run preview
 
 build-wasm:
-  wasm-pack build ./jexl-wasm --target web --release --no-default-features --features wee_alloc,console_error_panic_hook
+  wasm-pack build {{justfile_directory()}}/jexl-wasm \
+    --target web --release \
+    --no-default-features --features language-service && \
+        wasm-opt --inlining-optimizing -Oz -o {{justfile_directory()}}/jexl-wasm/pkg/jexl_wasm_bg.wasm {{justfile_directory()}}/jexl-wasm/pkg/jexl_wasm_bg.wasm && \
+        node jexl-3000-monaco/scripts/copy-assets.js && \
+        node demo-monaco/scripts/copy-assets.js
+
+twiggy-wasm:
+  RUSTFLAGS='-C debuginfo=2' wasm-pack build {{justfile_directory()}}/jexl-wasm \
+    --target web --dev \
+    --no-default-features --features language-service && \
+        twiggy top -n 200 {{justfile_directory()}}/jexl-wasm/pkg/jexl_wasm_bg.wasm
 
 build-tree-sitter:
-  cd tree-sitter-jexl3000 && tree-sitter generate && tree-sitter build-wasm && mv tree-sitter-jexl3000.wasm ../jexl-demo/public/tree-sitter-jexl3000.wasm
+  cd {{justfile_directory()}}/tree-sitter-jexl3000 && \
+    tree-sitter generate && \
+    tree-sitter build -w --reuse-allocator && \
+        cd {{justfile_directory()}} && \
+        node jexl-3000-monaco/scripts/copy-assets.js && \
+        node demo-monaco/scripts/copy-assets.js
+
+test-tree-sitter:
+  cd {{justfile_directory()}}/tree-sitter-jexl3000 && \
+    tree-sitter generate && \
+    tree-sitter build && \
+    tree-sitter test --rebuild
+
+build-parser:
+  cargo run --bin parser-gen
 
 build-napi:
-  cd jexl-node && RUSTFLAGS="-C target-cpu=native" npm run build
+  cd {{justfile_directory()}}/jexl-node && RUSTFLAGS="-C target-cpu=native" npm run build
+
+build-jexl-3000-monaco:
+  cd {{justfile_directory()}}/jexl-3000-monaco && npm run build && \
+    cd {{justfile_directory()}}/demo-monaco && npm run prepare-assets
+
+prepare-assets-demo-monaco:
+  cd {{justfile_directory()}}/demo-monaco && npm run prepare-assets
 
 test-wasm:
-  cd jexl-wasm && wasm-pack test --firefox
+  cd {{justfile_directory()}}/jexl-wasm && wasm-pack test --node
+  cd {{justfile_directory()}}/jexl-wasm && wasm-pack test --node -- --features language-service
 
 publish:
-  cd jexl-serverless && wrangler publish
+  cd {{justfile_directory()}}/jexl-serverless && wrangler publish
 
-deploy:
-  just build-wasm && cd jexl-demo && npx vite build && netlify deploy --prod
+deploy: test build-wasm build-tree-sitter build-jexl-3000-monaco
+  cd {{justfile_directory()}}/demo-monaco && npm run build && netlify deploy
 
-run-otel:
-  cargo run --release --bin jexl-server --features otel
-
-build-image:
-  docker build . -t jexl-3000-server
-
-run-container:
-  docker run --env-file .env.docker --name jexl-3000-server -p 5000:5000 jexl-3000-server
-
-start-container: _start-container _logs
-
-stop-container:
-  docker stop jexl-3000-server
-
-remove-container:
-  docker container rm jexl-3000-server
-
-_logs:
-  docker logs jexl-3000-server -f
-
-_start-container:
-  docker start jexl-3000-server
+deploy-prod: test build-wasm build-tree-sitter build-jexl-3000-monaco
+  cd {{justfile_directory()}}/demo-monaco && npm run build && netlify deploy --prod

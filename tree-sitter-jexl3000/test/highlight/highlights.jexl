@@ -1,0 +1,164 @@
+myVar
+# <- variable
+"hello"
+# <- string
+'world'
+# <- string
+42
+# <- number
+3.14
+# <- number
+0xFF
+# <- number
+1e+3
+# <- number
+100n
+# <- number
+true
+# <- constant.builtin
+false
+# <- constant.builtin
+null
+# <- constant.builtin
+$now
+# <- constant.builtin
+$now_utc
+# <- constant.builtin
+this
+# <- keyword.special
+acc
+# <- variable.builtin
+!x
+# <- operator
+#^ variable
+"hello \n world"
+#       ^^ string.escape
+'tab\there'
+#   ^^ string.escape
+x ~ /pattern/
+# <- variable
+# ^ operator
+#    ^^^^^^^^ string.regexp
+x ~ /abc/gim
+#    ^^^ string.regexp
+#        ^^^ string.special
+x @ /abcdef/
+# ^ operator
+#    ^^^^^^ string.regexp
+items | map(this.value)
+# <- variable
+#     ^ operator
+#       ^^^ function.builtin
+#          ^ punctuation.bracket
+#           ^^^^ keyword.special
+#               ^ punctuation.delimiter
+#                ^^^^^ property
+#                     ^ punctuation.bracket
+items | filter(this.active)
+#       ^^^^^^ function.builtin
+items | reduce(0, acc + this)
+#       ^^^^^^ function.builtin
+#              ^ number
+#               ^ punctuation.delimiter
+#                 ^^^ variable.builtin
+#                     ^ operator
+#                       ^^^^ keyword.special
+items | sortBy(this.name)
+#       ^^^^^^ function.builtin
+items | find(this.id == 1)
+#       ^^^^ function.builtin
+items | findIndex(this.active)
+#       ^^^^^^^^^ function.builtin
+items | any(this > 0)
+#       ^^^ function.builtin
+items | all(this > 0)
+#       ^^^ function.builtin
+items | apply(this.x + 1)
+#       ^^^^^ function.builtin
+value | uppercase
+# <- variable
+#       ^^^^^^^^^ function
+name | trim
+#      ^^^^ function
+obj.name
+# <- variable
+#    ^^^^ property
+obj.foo.bar
+# <- variable
+#   ^^^ property
+#       ^^^ property
+obj?.value
+# <- variable
+#    ^^^^^ property
+{ active }
+# <- punctuation.bracket
+# ^^^^^^ property
+{ name }
+# ^^^^ property
+{ key: 1, shorthand }
+# ^^^ property
+#    ^ punctuation.delimiter
+#      ^ number
+#       ^ punctuation.delimiter
+#         ^^^^^^^^^ property
+{ best_vote: 42 }
+# ^^^^^^^^^ property
+{ title: "hello", note: "world" }
+# ^^^^^ property
+#                 ^^^^ property
+{ a: 1, b: 2, c: 3 }
+# ^ property
+#       ^ property
+#             ^ property
+a + b
+# <- variable
+# ^ operator
+#   ^ variable
+a - b
+# ^ operator
+a * b
+# ^ operator
+a / b
+# ^ operator
+a % b
+# ^ operator
+a ^ b
+# ^ operator
+a // b
+# ^^ operator
+a && b
+# ^^ operator
+a || b
+# ^^ operator
+a ?? b
+# ^^ operator
+a < b
+# ^ operator
+a <= b
+# ^^ operator
+a > b
+# ^ operator
+a >= b
+# ^^ operator
+a == b
+# ^^ operator
+a != b
+# ^^ operator
+a in b
+# ^^ operator
+x @+ y
+# ^^ operator
+(a + b)
+# <- punctuation.bracket
+[1, 2]
+# <- punctuation.bracket
+#^ number
+#   ^ number
+[a, b]
+# ^ punctuation.delimiter
+a ? b : c
+# <- variable
+# ^ operator
+#   ^ variable
+#     ^ punctuation.delimiter
+#       ^ variable

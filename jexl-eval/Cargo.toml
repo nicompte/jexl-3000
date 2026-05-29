@@ -11,16 +11,32 @@ description = "A JEXL evaluator written in Rust"
 license = "MPL-2.0"
 repository = "https://github.com/mozilla/jexl-rs"
 
+[features]
+default = []
+language-service = []
+
 [dependencies]
-dashmap = "5.4.0"
 fxhash = "0.2.1"
 jexl-parser = { version = "^0.1.7-alpha.0", path = "../jexl-parser" }
-regex.workspace = true
-rustc-hash = "1.1.0"
+regex-lite.workspace = true
+rustc-hash = "2.1.1"
 serde.workspace = true
 serde_json.workspace = true
+smallvec = "1.11"
 thiserror.workspace = true
-time = { workspace = true, features = ["local-offset", "parsing"] }
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.time]
+workspace = true
+features = ["local-offset", "parsing", "wasm-bindgen"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.time]
+workspace = true
+features = ["parsing", "wasm-bindgen"]
 
 [dev-dependencies]
-rstest = "0.16.0"
+criterion = "0.8"
+jexl-3000 = { path = "../jexl-3000" }
+rstest = "0.26.0"
+
+[[bench]]
+name = "evaluator"
+harness = false

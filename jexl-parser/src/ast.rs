@@ -18,7 +18,7 @@ pub enum Expr {
     Array(Vec<Box<Expression>>),
     Object(Vec<(String, Box<Expression>)>),
     Identifier(String),
-    Regex(String),
+    Regex(String, String),
     UnaryOperation {
         operation: UnCode,
         right: Box<Expression>,
@@ -40,18 +40,40 @@ pub enum Expr {
     IndexOperation {
         subject: Box<Expression>,
         index: Box<Expression>,
+        is_filter: bool,
     },
+    FilterItemProperty(String),
     Conditional {
         left: Box<Expression>,
         truthy: Box<Expression>,
         falsy: Box<Expression>,
     },
-    Filter {
-        ident: String,
-        op: OpCode,
-        right: Box<Expression>,
-    },
     MapTransform {
+        subject: Box<Expression>,
+        name: String,
+        args: Option<Vec<Box<Expression>>>,
+    },
+    SortByTransform {
+        subject: Box<Expression>,
+        name: String,
+        args: Option<Vec<Box<Expression>>>,
+    },
+    AnyTransform {
+        subject: Box<Expression>,
+        name: String,
+        args: Option<Vec<Box<Expression>>>,
+    },
+    AllTransform {
+        subject: Box<Expression>,
+        name: String,
+        args: Option<Vec<Box<Expression>>>,
+    },
+    FindTransform {
+        subject: Box<Expression>,
+        name: String,
+        args: Option<Vec<Box<Expression>>>,
+    },
+    FindIndexTransform {
         subject: Box<Expression>,
         name: String,
         args: Option<Vec<Box<Expression>>>,
@@ -74,18 +96,7 @@ pub enum Expr {
     },
     Now,
     NowUtc,
-    Date {
-        date: Box<Expression>,
-        format: Box<Expression>,
-    },
-    DateTime {
-        datetime: Box<Expression>,
-        format: Box<Expression>,
-    },
-    Duration {
-        duration: Box<Expression>,
-        duration_type: Box<Expression>,
-    },
+    Null,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -171,5 +182,84 @@ impl std::fmt::Display for UnCode {
                 UnCode::Minus => "Minus",
             }
         )
+    }
+}
+
+/// Returns true if `expr` contains at least one `FilterItemProperty` node anywhere
+/// in its subtree. Used at parse time to annotate `IndexOperation` nodes with
+/// `is_filter`, so the evaluator can branch without a runtime tree walk.
+pub fn contains_filter_property(expr: &Expression) -> bool {
+    match &expr.expression {
+        Expr::FilterItemProperty(_) => true,
+        Expr::BinaryOperation { left, right, .. } => {
+            contains_filter_property(left) || contains_filter_property(right)
+        }
+        Expr::UnaryOperation { right, .. } => contains_filter_property(right),
+        Expr::Conditional {
+            left,
+            truthy,
+            falsy,
+        } => {
+            contains_filter_property(left)
+                || contains_filter_property(truthy)
+                || contains_filter_property(falsy)
+        }
+        // `is_filter` already encodes whether the index sub-tree contains any
+        // FilterItemProperty, so we can short-circuit instead of re-walking it.
+        // Known limitation: `arr[arr2[.x == 1]]` marks the *outer* IndexOperation
+        // as is_filter=true because the inner node's is_filter leaks up through this
+        // check.  In practice the evaluator then tries to filter `arr` using the
+        // array result of `arr2[.x == 1]` as a predicate, which silently returns no
+        // results.  This was the same behaviour before this refactor; a proper fix
+        // would require distinguishing "filter property in the immediate index" from
+        // "filter property nested inside a sub-index".
+        Expr::IndexOperation {
+            subject, is_filter, ..
+        } => *is_filter || contains_filter_property(subject),
+        Expr::DotOperation { subject, .. } => contains_filter_property(subject),
+        Expr::Array(items) => items.iter().any(|item| contains_filter_property(item)),
+        Expr::Object(items) => items.iter().any(|(_, e)| contains_filter_property(e)),
+        Expr::Transform { subject, args, .. } => {
+            contains_filter_property(subject)
+                || args
+                    .as_ref()
+                    .map(|a| a.iter().any(|e| contains_filter_property(e)))
+                    .unwrap_or(false)
+        }
+        Expr::MapTransform { subject, args, .. }
+        | Expr::FilterTransform { subject, args, .. }
+        | Expr::SortByTransform { subject, args, .. }
+        | Expr::AnyTransform { subject, args, .. }
+        | Expr::AllTransform { subject, args, .. }
+        | Expr::FindTransform { subject, args, .. }
+        | Expr::FindIndexTransform { subject, args, .. } => {
+            contains_filter_property(subject)
+                || args
+                    .as_ref()
+                    .map(|a| a.iter().any(|e| contains_filter_property(e)))
+                    .unwrap_or(false)
+        }
+        Expr::ExpressionTransform {
+            subject,
+            expression,
+            ..
+        } => contains_filter_property(subject) || contains_filter_property(expression),
+        Expr::ReduceExpression {
+            subject,
+            init,
+            expression,
+        } => {
+            contains_filter_property(subject)
+                || contains_filter_property(init)
+                || contains_filter_property(expression)
+        }
+        Expr::Number(_)
+        | Expr::String(_)
+        | Expr::Boolean(_)
+        | Expr::Identifier(_)
+        | Expr::Regex(_, _)
+        | Expr::Now
+        | Expr::NowUtc
+        | Expr::Null => false,
     }
 }

@@ -1,0 +1,75 @@
+{
+  "type": "object",
+  "properties": {
+    "movies": {
+      "type": "array",
+      "description": "List of movies",
+      "items": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "ISO 639-1 language code of the original language (e.g. \"en\", \"fr\")"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the movie"
+          },
+          "popularity": {
+            "type": "number",
+            "description": "Popularity score from TMDB"
+          },
+          "release_date": {
+            "type": "string",
+            "description": "Release date in YYYY-MM-DD format",
+            "nullable": true
+          },
+          "vote_average": {
+            "type": "number",
+            "description": "Average vote score, between 0 and 10"
+          },
+          "vote_count": {
+            "type": "number",
+            "description": "Total number of votes"
+          },
+          "genre": {
+            "type": "array",
+            "description": "List of genres, e.g. [\"Action\", \"Drama\"]",
+            "items": {
+              "type": "string"
+            }
+          },
+          "overview": {
+            "type": "string",
+            "description": "Short plot summary of the movie",
+            "nullable": true
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Box office revenue in USD (0 if unknown)"
+          },
+          "runtime": {
+            "type": "number",
+            "description": "Duration of the movie in minutes"
+          },
+          "tagline": {
+            "type": "string",
+            "description": "Official tagline of the movie",
+            "nullable": true
+          }
+        },
+        "required": [
+          "language",
+          "title",
+          "popularity",
+          "vote_average",
+          "vote_count",
+          "genre",
+          "revenue",
+          "runtime"
+        ]
+      }
+    }
+  },
+  "required": ["movies"]
+}

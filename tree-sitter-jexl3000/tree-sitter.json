@@ -1,0 +1,14 @@
+{
+  "grammars": [
+    {
+      "name": "jexl3000",
+      "scope": "source.jexl3000",
+      "file-types": ["jexl3000", "jexl"],
+      "path": ".",
+      "highlights": ["queries/highlights.scm"]
+    }
+  ],
+  "metadata": {
+    "version": "0.24.0"
+  }
+}

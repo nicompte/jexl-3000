@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>jexl-3000 Playground</title>
+        <meta property="og:title" content="jexl-3000 Playground" />
+        <meta property="og:url" content="https://jexl-3000.barbotte.net" />
+        <meta
+            property="og:image"
+            content="https://jexl-3000.barbotte.net/logo.png"
+        />
+        <meta name="description" content="Playground for jexl-3000" />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@200&display=swap"
+            rel="stylesheet"
+            rel="preload" as="style"
+        />
+
+        <!-- Main stylesheet moved to external file -->
+        <link rel="stylesheet" href="./styles.css" rel="preload" as="style"/>
+
+        
+
+        <link
+            rel="apple-touch-icon"
+            sizes="57x57"
+            href="/favicon/apple-icon-57x57.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="60x60"
+            href="/favicon/apple-icon-60x60.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="72x72"
+            href="/favicon/apple-icon-72x72.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="76x76"
+            href="/favicon/apple-icon-76x76.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="114x114"
+            href="/favicon/apple-icon-114x114.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="120x120"
+            href="/favicon/apple-icon-120x120.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="144x144"
+            href="/favicon/apple-icon-144x144.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="152x152"
+            href="/favicon/apple-icon-152x152.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="180x180"
+            href="/favicon/apple-icon-180x180.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href="/favicon/android-icon-192x192.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="32x32"
+            href="/favicon/favicon-32x32.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="96x96"
+            href="/favicon/favicon-96x96.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="16x16"
+            href="/favicon/favicon-16x16.png"
+        />
+        <link rel="manifest" href="/favicon/manifest.json" />
+        <meta name="msapplication-TileColor" content="#ffffff" />
+        <meta
+            name="msapplication-TileImage"
+            content="/favicon/ms-icon-144x144.png"
+        />
+        <meta name="theme-color" content="#ffffff" />
+
+        <script
+            defer
+            src="https://um.kalatawa.com/script.js"
+            data-website-id="5e3788ec-2a35-47eb-bd04-490cf7146fd1"
+        ></script>
+    </head>
+
+    <body class="resizers-hidden">
+        <div id="app">
+            <header>
+                <img src="/logo.png" alt="jexl-3000 logo" />
+                <div class="header-controls">
+                    <div class="control-group">
+                        <span>Parse time:</span>
+                        <span id="update-time">0ms</span>
+                    </div>
+                </div>
+
+                <!-- Reset button: resets editors and clears persisted state -->
+                <button
+                    type="button"
+                    class="doc-toggle-btn"
+                    id="reset-btn"
+                    title="Reset demo to defaults"
+                    aria-label="Reset demo to defaults"
+                >
+                    🔄 Hop
+                </button>
+
+                <button
+                    type="button"
+                    class="doc-toggle-btn"
+                    id="doc-toggle-btn"
+                    title="Toggle documentation panel"
+                    aria-haspopup="dialog"
+                >
+                    📖 Docs
+                </button>
+                <h1>Playground</h1>
+            </header>
+
+            <div
+                class="warning-bar hidden"
+                id="warning-panel"
+                aria-live="polite"
+            ></div>
+
+            <main>
+                <div class="pane" id="context-pane">
+                    <div class="pane-title">Context</div>
+                    <div class="editor-container" id="context-editor"></div>
+                </div>
+
+                <div class="pane" id="expression-pane">
+                    <div class="pane-title">
+                        Expression
+                        <button
+                            type="button"
+                            class="pane-action-btn"
+                            id="format-btn"
+                            title="Format expression (Shift+Alt+F)"
+                            aria-label="Format expression"
+                        >✨ Format</button>
+                    </div>
+                    <div class="editor-container" id="expression-editor"></div>
+                </div>
+
+                <div class="col-resizer" aria-hidden="true"></div>
+                <div class="row-resizer" aria-hidden="true"></div>
+
+                <div class="pane" id="schema-pane">
+                    <div class="pane-title">Schema</div>
+                    <div class="editor-container" id="schema-editor"></div>
+                </div>
+
+                <div class="pane" id="result-pane">
+                    <div class="pane-title">Result</div>
+                    <div class="editor-container" id="result-editor"></div>
+                </div>
+            </main>
+        </div>
+
+        <script type="module" src="./src/playground.js"></script>
+
+        <!-- Reset wiring: when clicked, clear persisted state and restore defaults into editors.
+             This script attempts to fetch the default context and expression files from /default_context.json
+             and /default_expression.jexl-3000 and apply them to Monaco editors exposed via
+             window.jexlPlayground.state. It falls back to using in-memory DEFAULT_* values if necessary. -->
+        <script>
+            (() => {
+                function applyFallbackDefaults(apiState) {
+                    try {
+                        if (!apiState) return;
+                        if (
+                            apiState.contextEditor &&
+                            apiState.DEFAULT_CONTEXT
+                        ) {
+                            apiState.contextEditor.setValue(
+                                JSON.stringify(
+                                    apiState.DEFAULT_CONTEXT,
+                                    null,
+                                    2,
+                                ),
+                            );
+                        }
+                        if (
+                            apiState.expressionEditor &&
+                            apiState.DEFAULT_EXPRESSION
+                        ) {
+                            apiState.expressionEditor.setValue(
+                                apiState.DEFAULT_EXPRESSION,
+                            );
+                        }
+                        if (apiState.schemaEditor && apiState.DEFAULT_SCHEMA) {
+                            apiState.schemaEditor.setValue(
+                                JSON.stringify(
+                                    apiState.DEFAULT_SCHEMA,
+                                    null,
+                                    2,
+                                ),
+                            );
+                        }
+                        try {
+                            apiState.completionProvider?.setContext?.(
+                                apiState.currentContext ??
+                                    apiState.DEFAULT_CONTEXT,
+                            );
+                            apiState.completionProvider?.setSchema?.(
+                                apiState.currentSchema ??
+                                    apiState.DEFAULT_SCHEMA,
+                            );
+                        } catch (e) {
+                            console.warn(
+                                "Error applying defaults to completion provider",
+                                e,
+                            );
+                        }
+                    } catch (e) {
+                        console.warn("Error applying fallback defaults", e);
+                    }
+                }
+
+                function doReset() {
+                    try {
+                        // Clear persisted saved state so loadState won't overwrite defaults
+                        localStorage.removeItem("jexl-playground-state");
+
+                        // Wait for the playground API + editors to be available
+                        const applyWhenReady = () => {
+                            const api = window.jexlPlayground;
+                            if (!api || !api.state) {
+                                // try again shortly
+                                setTimeout(applyWhenReady, 100);
+                                return;
+                            }
+
+                            const s = api.state;
+
+                            // Try to fetch the default files served from / (public/)
+                            Promise.all([
+                                fetch("/default_context.json")
+                                    .then((r) =>
+                                        r.ok
+                                            ? r.text()
+                                            : Promise.reject(
+                                                  "ctx fetch failed",
+                                              ),
+                                    )
+                                    .catch(() => null),
+                                fetch("/default_expression.jexl-3000")
+                                    .then((r) =>
+                                        r.ok
+                                            ? r.text()
+                                            : Promise.reject(
+                                                  "expr fetch failed",
+                                              ),
+                                    )
+                                    .catch(() => null),
+                                fetch("/default_schema.json")
+                                    .then((r) =>
+                                        r.ok
+                                            ? r.text()
+                                            : Promise.reject(
+                                                  "schema fetch failed",
+                                              ),
+                                    )
+                                    .catch(() => null),
+                            ])
+                                .then(([ctxText, exprText, schemaText]) => {
+                                    try {
+                                        if (ctxText && s.contextEditor) {
+                                            // Ensure pretty JSON
+                                            try {
+                                                const parsed =
+                                                    JSON.parse(ctxText);
+                                                s.contextEditor.setValue(
+                                                    JSON.stringify(
+                                                        parsed,
+                                                        null,
+                                                        2,
+                                                    ),
+                                                );
+                                            } catch {
+                                                s.contextEditor.setValue(
+                                                    ctxText,
+                                                );
+                                            }
+                                            try {
+                                                s.currentContext = JSON.parse(
+                                                    s.contextEditor.getValue(),
+                                                );
+                                            } catch {
+                                                // ignore
+                                            }
+                                            try {
+                                                s.completionProvider?.setContext?.(
+                                                    s.currentContext,
+                                                );
+                                            } catch {}
+                                        } else if (
+                                            s.contextEditor &&
+                                            s.DEFAULT_CONTEXT
+                                        ) {
+                                            s.contextEditor.setValue(
+                                                JSON.stringify(
+                                                    s.DEFAULT_CONTEXT,
+                                                    null,
+                                                    2,
+                                                ),
+                                            );
+                                            s.currentContext = structuredClone
+                                                ? structuredClone(
+                                                      s.DEFAULT_CONTEXT,
+                                                  )
+                                                : s.DEFAULT_CONTEXT;
+                                            try {
+                                                s.completionProvider?.setContext?.(
+                                                    s.currentContext,
+                                                );
+                                            } catch {}
+                                        }
+
+                                        if (exprText && s.expressionEditor) {
+                                            s.expressionEditor.setValue(
+                                                exprText,
+                                            );
+                                            s.currentExpression =
+                                                s.expressionEditor.getValue();
+                                        } else if (
+                                            s.expressionEditor &&
+                                            s.DEFAULT_EXPRESSION
+                                        ) {
+                                            s.expressionEditor.setValue(
+                                                s.DEFAULT_EXPRESSION,
+                                            );
+                                            s.currentExpression =
+                                                s.DEFAULT_EXPRESSION;
+                                        }
+
+                                        // Schema: prefer fetched default_schema.json, fall back to in-memory DEFAULT_SCHEMA
+                                        if (s.schemaEditor) {
+                                            if (schemaText) {
+                                                try {
+                                                    const parsedSchema =
+                                                        JSON.parse(schemaText);
+                                                    s.schemaEditor.setValue(
+                                                        JSON.stringify(
+                                                            parsedSchema,
+                                                            null,
+                                                            2,
+                                                        ),
+                                                    );
+                                                    s.currentSchema =
+                                                        parsedSchema;
+                                                } catch {
+                                                    s.schemaEditor.setValue(
+                                                        schemaText,
+                                                    );
+                                                }
+                                            } else if (s.DEFAULT_SCHEMA) {
+                                                s.schemaEditor.setValue(
+                                                    JSON.stringify(
+                                                        s.DEFAULT_SCHEMA,
+                                                        null,
+                                                        2,
+                                                    ),
+                                                );
+                                                s.currentSchema =
+                                                    structuredClone
+                                                        ? structuredClone(
+                                                              s.DEFAULT_SCHEMA,
+                                                          )
+                                                        : s.DEFAULT_SCHEMA;
+                                            }
+                                            try {
+                                                s.completionProvider?.setSchema?.(
+                                                    s.currentSchema,
+                                                );
+                                            } catch {}
+                                        }
+
+                                        // Trigger evaluation and rescans so UI updates
+                                        try {
+                                            api.evaluateExpression?.();
+                                            api.scanExpressionWarnings?.();
+                                        } catch (e) {
+                                            // ignore
+                                        }
+                                    } catch (e) {
+                                        // Fallback to in-memory defaults
+                                        applyFallbackDefaults(s);
+                                        try {
+                                            api.evaluateExpression?.();
+                                            api.scanExpressionWarnings?.();
+                                        } catch {}
+                                    }
+                                })
+                                .catch(() => {
+                                    // If fetch fails, use in-memory defaults
+                                    applyFallbackDefaults(s);
+                                    try {
+                                        api.evaluateExpression?.();
+                                        api.scanExpressionWarnings?.();
+                                    } catch {}
+                                });
+                        };
+
+                        applyWhenReady();
+                    } catch (e) {
+                        console.warn("Error during reset", e);
+                    }
+                }
+
+                // Wire up the button after DOM is ready
+                document.addEventListener("DOMContentLoaded", () => {
+                    const btn = document.getElementById("reset-btn");
+                    if (btn) {
+                        btn.addEventListener("click", () => {
+                            doReset();
+                        });
+                    }
+
+                    const formatBtn = document.getElementById("format-btn");
+                    if (formatBtn) {
+                        formatBtn.addEventListener("click", () => {
+                            // Trigger Monaco's built-in format action on the expression editor
+                            const editor = document.getElementById("expression-editor");
+                            if (editor) {
+                                const editorInstance = window.__jexl3000_expressionEditor;
+                                if (editorInstance) {
+                                    editorInstance.getAction("editor.action.formatDocument")?.run();
+                                }
+                            }
+                        });
+                    }
+                });
+            })();
+        </script>
+
+        <!-- Documentation panel backdrop -->
+        <!-- Resizer between main content and the doc panel -->
+        <div class="doc-panel-resizer" id="doc-panel-resizer" aria-hidden="true"></div>
+
+        <div
+            class="doc-panel-backdrop"
+            id="doc-panel-backdrop"
+            aria-hidden="true"
+        ></div>
+
+        <!-- Documentation slide-over panel -->
+        <aside
+            class="doc-panel doc-panel-boot-hidden"
+            id="doc-panel"
+            role="dialog"
+            aria-label="jexl-3000 Documentation"
+        >
+            <div class="doc-panel-header">
+                <span class="doc-panel-title">📖 jexl-3000 Documentation</span>
+                <button
+                    type="button"
+                    class="doc-panel-close"
+                    id="doc-panel-close"
+                    title="Close"
+                    aria-label="Close documentation panel"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <div class="doc-search-bar">
+                <span class="doc-search-icon">🔍</span>
+                <input
+                    class="doc-search"
+                    id="doc-search"
+                    type="search"
+                    placeholder="Search…"
+                    autocomplete="off"
+                    spellcheck="false"
+                />
+                <button
+                    type="button"
+                    class="doc-search-clear"
+                    id="doc-search-clear"
+                    title="Clear search"
+                    aria-label="Clear search"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <div class="doc-panel-body">
+                <nav
+                    class="doc-category-nav"
+                    id="doc-category-nav"
+                    aria-label="Doc categories"
+                ></nav>
+                <div
+                    class="doc-entry-list"
+                    id="doc-entry-list"
+                    role="list"
+                ></div>
+            </div>
+        </aside>
+    </body>
+</html>

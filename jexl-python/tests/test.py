@@ -10,6 +10,6 @@ context =  {
     ]
 }
 
-res = evaluator.evaluate("{meanAge: users | pick('age') | mean | toInt, youngest: users | sortByAttribute('age') | first}", context)
+res = evaluator.evaluate("{meanAge: users | pick('age') | mean | toInteger, youngest: users | sortByAttribute('age') | first}", context)
 
 print(res)
